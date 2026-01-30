@@ -102,8 +102,8 @@ class Woo_Excel_Mng_Frontend
         // تغییر label quantity در صفحه محصول برای محصولات با فرمول
         add_action('woocommerce_before_add_to_cart_quantity', array($this, 'add_quantity_label'), 10);
 
-        // نمایش جمع وزن زیر فاکتور سبد خرید
-        add_action('woocommerce_cart_totals_after_order_total', array($this, 'render_total_weight_row'), 10);
+        // نمایش جمع وزن قبل از جمع کل سبد خرید
+        add_action('woocommerce_cart_totals_before_order_total', array($this, 'render_total_weight_row'), 10);
 
         // اضافه کردن script برای تنظیم step و min در cart
         add_action('wp_footer', array($this, 'add_cart_quantity_script'), 99);
