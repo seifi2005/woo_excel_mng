@@ -12,6 +12,8 @@ class Woo_Excel_Mng_Frontend
 {
 
     const CART_ITEM_METERAGE_KEY = 'woo_excel_meterage';
+    const METERAGE_MIN_DEFAULT = 0.5;
+    const METERAGE_STEP_DEFAULT = 0.5;
     private static $skip_cart_id_filter = false;
 
     /**
@@ -150,6 +152,8 @@ class Woo_Excel_Mng_Frontend
             'ajax_url' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('woo_excel_mng_frontend_nonce'),
             'has_formula_product' => $has_formula_product,
+            'meterage_min' => $this->get_meterage_min(),
+            'meterage_step' => $this->get_meterage_step(),
             'strings' => array(
                 'enter_meterage' => __('لطفاً متراژ را وارد کنید.', 'woo-excel-mng'),
                 'calculating' => __('در حال محاسبه...', 'woo-excel-mng'),
@@ -208,6 +212,39 @@ class Woo_Excel_Mng_Frontend
     }
 
     /**
+     * حداقل متراژ مجاز
+     */
+    private function get_meterage_min()
+    {
+        $min = apply_filters('woo_excel_mng_meterage_min', self::METERAGE_MIN_DEFAULT);
+        return max(0, floatval($min));
+    }
+
+    /**
+     * گام افزایش متراژ
+     */
+    private function get_meterage_step()
+    {
+        $step = apply_filters('woo_excel_mng_meterage_step', self::METERAGE_STEP_DEFAULT);
+        return max(0, floatval($step));
+    }
+
+    /**
+     * نرمال‌سازی متراژ بر اساس گام
+     */
+    private function normalize_meterage_value($value)
+    {
+        $meterage = floatval($value);
+        $step = $this->get_meterage_step();
+
+        if ($step > 0) {
+            $meterage = round($meterage / $step) * $step;
+        }
+
+        return round($meterage, 2);
+    }
+
+    /**
      * محاسبه کلید سبد خرید بدون در نظر گرفتن متراژ
      */
     public function filter_cart_id($cart_id, $product_id, $variation_id, $variation, $cart_item_data)
@@ -253,16 +290,16 @@ class Woo_Excel_Mng_Frontend
 
         $incoming_meterage = 0;
         if (isset($cart_item_data[self::CART_ITEM_METERAGE_KEY])) {
-            $incoming_meterage = floatval($cart_item_data[self::CART_ITEM_METERAGE_KEY]);
+            $incoming_meterage = $this->normalize_meterage_value($cart_item_data[self::CART_ITEM_METERAGE_KEY]);
         } elseif (isset($_REQUEST[self::CART_ITEM_METERAGE_KEY])) {
-            $incoming_meterage = floatval($this->normalize_decimal_input($_REQUEST[self::CART_ITEM_METERAGE_KEY]));
+            $incoming_meterage = $this->normalize_meterage_value($this->normalize_decimal_input($_REQUEST[self::CART_ITEM_METERAGE_KEY]));
         } elseif (isset($_REQUEST['meterage'])) {
-            $incoming_meterage = floatval($this->normalize_decimal_input($_REQUEST['meterage']));
+            $incoming_meterage = $this->normalize_meterage_value($this->normalize_decimal_input($_REQUEST['meterage']));
         } elseif (isset($_REQUEST['quantity'])) {
-            $incoming_meterage = floatval($this->normalize_decimal_input($_REQUEST['quantity']));
+            $incoming_meterage = $this->normalize_meterage_value($this->normalize_decimal_input($_REQUEST['quantity']));
         }
 
-        if ($incoming_meterage <= 0) {
+        if ($incoming_meterage <= 0 || $incoming_meterage < $this->get_meterage_min()) {
             return;
         }
 
@@ -330,10 +367,10 @@ class Woo_Excel_Mng_Frontend
 
         if ($meterage_raw !== null) {
             $meterage_raw = $this->normalize_decimal_input($meterage_raw);
-            $meterage = floatval($meterage_raw);
+            $meterage = $this->normalize_meterage_value($meterage_raw);
         }
 
-        if ($meterage !== null && $meterage >= 0.1) {
+        if ($meterage !== null && $meterage >= $this->get_meterage_min()) {
             $cart_item_data[self::CART_ITEM_METERAGE_KEY] = $meterage;
         }
 
@@ -380,9 +417,9 @@ class Woo_Excel_Mng_Frontend
             return $product_quantity;
         }
 
-        $meterage = isset($cart_item[self::CART_ITEM_METERAGE_KEY]) ? floatval($cart_item[self::CART_ITEM_METERAGE_KEY]) : 1;
-        if ($meterage < 0.1) {
-            $meterage = 1;
+        $meterage = isset($cart_item[self::CART_ITEM_METERAGE_KEY]) ? floatval($cart_item[self::CART_ITEM_METERAGE_KEY]) : $this->get_meterage_min();
+        if ($meterage < $this->get_meterage_min()) {
+            $meterage = $this->get_meterage_min();
         }
 
         $meterage_formatted = woo_excel_mng_format_number($meterage, 2, '.', '');
@@ -392,7 +429,7 @@ class Woo_Excel_Mng_Frontend
         $html .= '<input type="number" class="input-text qty text woo-excel-meterage-input" ';
         $html .= 'name="' . esc_attr(self::CART_ITEM_METERAGE_KEY) . '[' . esc_attr($cart_item_key) . ']" ';
         $html .= 'id="woo-excel-meterage-' . esc_attr($cart_item_key) . '" ';
-        $html .= 'value="' . esc_attr($meterage_formatted) . '" step="0.01" min="0.1" inputmode="decimal" />';
+        $html .= 'value="' . esc_attr($meterage_formatted) . '" step="' . esc_attr($this->get_meterage_step()) . '" min="' . esc_attr($this->get_meterage_min()) . '" inputmode="decimal" />';
         $html .= '<input type="hidden" name="cart[' . esc_attr($cart_item_key) . '][qty]" value="1" />';
         $html .= '</div>';
 
@@ -420,9 +457,9 @@ class Woo_Excel_Mng_Frontend
         foreach ($_POST[self::CART_ITEM_METERAGE_KEY] as $cart_item_key => $meterage_raw) {
             $cart_item_key = sanitize_text_field($cart_item_key);
             $meterage_raw = $this->normalize_decimal_input($meterage_raw);
-            $meterage = floatval($meterage_raw);
+            $meterage = $this->normalize_meterage_value($meterage_raw);
 
-            if ($meterage < 0.1) {
+            if ($meterage < $this->get_meterage_min()) {
                 continue;
             }
 
@@ -496,8 +533,8 @@ class Woo_Excel_Mng_Frontend
 
         if ($has_formula) {
             $args['input_name'] = 'quantity';
-            $args['min_value'] = 0.1;
-            $args['step'] = 0.01;
+            $args['min_value'] = $this->get_meterage_min();
+            $args['step'] = $this->get_meterage_step();
             $args['inputmode'] = 'decimal';
             // اضافه کردن label سفارشی
             if (!isset($args['classes'])) {
@@ -537,13 +574,15 @@ class Woo_Excel_Mng_Frontend
         $input_id = isset($args['input_id']) ? $args['input_id'] : 'woo_excel_meterage';
         $input_value = isset($args['input_value']) ? $args['input_value'] : 1;
         $input_value = $input_value ? $input_value : 1;
+        $min_value = $this->get_meterage_min();
+        $step_value = $this->get_meterage_step();
 
         $label = esc_html__('متراژ (متر)', 'woo-excel-mng');
         $html  = '<div class="quantity">';
         $html .= '<label class="screen-reader-text" for="' . esc_attr($input_id) . '">' . $label . '</label>';
         $html .= '<input type="text" id="' . esc_attr($input_id) . '" class="input-text qty text woo-excel-meterage-quantity" ';
         $html .= 'name="woo_excel_meterage" value="' . esc_attr($input_value) . '" ';
-        $html .= 'inputmode="decimal" autocomplete="off" />';
+        $html .= 'inputmode="decimal" autocomplete="off" data-min="' . esc_attr($min_value) . '" data-step="' . esc_attr($step_value) . '" />';
         $html .= '<input type="hidden" name="quantity" value="1" />';
         $html .= '</div>';
 
@@ -573,8 +612,8 @@ class Woo_Excel_Mng_Frontend
                         $formula = Woo_Excel_Mng_Formulas::get_product_formula($parent_id);
                         if ($formula) {
                             // تنظیم step و min برای quantity در cart
-                            $args['min_value'] = 0.1;
-                            $args['step'] = 0.01;
+                            $args['min_value'] = $this->get_meterage_min();
+                            $args['step'] = $this->get_meterage_step();
                             break;
                         }
                     }
@@ -584,8 +623,8 @@ class Woo_Excel_Mng_Frontend
             $parent_id = $product->get_parent_id();
             $formula = Woo_Excel_Mng_Formulas::get_product_formula($parent_id);
             if ($formula) {
-                $args['min_value'] = 0.1;
-                $args['step'] = 0.01;
+                $args['min_value'] = $this->get_meterage_min();
+                $args['step'] = $this->get_meterage_step();
             }
         }
 
@@ -602,7 +641,7 @@ class Woo_Excel_Mng_Frontend
             $parent_id = $product->get_parent_id();
             $formula = Woo_Excel_Mng_Formulas::get_product_formula($parent_id);
             if ($formula) {
-                $meterage = isset($cart_item[self::CART_ITEM_METERAGE_KEY]) ? floatval($cart_item[self::CART_ITEM_METERAGE_KEY]) : 1;
+                $meterage = isset($cart_item[self::CART_ITEM_METERAGE_KEY]) ? floatval($cart_item[self::CART_ITEM_METERAGE_KEY]) : $this->get_meterage_min();
                 $formatted_meterage = woo_excel_mng_format_number($meterage, 2, '.', '');
                 $product_name .= '<br><small class="woo-excel-meterage-display">' . sprintf(__('متراژ: %s متر', 'woo-excel-mng'), $formatted_meterage) . '</small>';
             }
@@ -1097,8 +1136,8 @@ class Woo_Excel_Mng_Frontend
                         if ($row.find('.woo-excel-meterage-display').length > 0) {
                             // تنظیم step و min برای جلوگیری از گرد شدن
                             $input.attr({
-                                'step': '0.01',
-                                'min': '0.1',
+                                'step': '<?php echo esc_js($this->get_meterage_step()); ?>',
+                                'min': '<?php echo esc_js($this->get_meterage_min()); ?>',
                                 'type': 'number'
                             });
                         }
@@ -1193,9 +1232,9 @@ class Woo_Excel_Mng_Frontend
                 }
 
                 // متراژ از cart item meta (quantity همیشه 1)
-                $meterage = isset($cart_item[self::CART_ITEM_METERAGE_KEY]) ? floatval($cart_item[self::CART_ITEM_METERAGE_KEY]) : 1;
-                if ($meterage < 0.1) {
-                    $meterage = 1;
+                $meterage = isset($cart_item[self::CART_ITEM_METERAGE_KEY]) ? floatval($cart_item[self::CART_ITEM_METERAGE_KEY]) : $this->get_meterage_min();
+                if ($meterage < $this->get_meterage_min()) {
+                    $meterage = $this->get_meterage_min();
                 }
 
                 // اجباری: qty باید integer باشد
@@ -1529,9 +1568,9 @@ class Woo_Excel_Mng_Frontend
 
         $variation_id = isset($_POST['variation_id']) ? intval($_POST['variation_id']) : 0;
         $meterage_raw = isset($_POST['meterage']) ? $this->normalize_decimal_input($_POST['meterage']) : '';
-        $meterage = floatval($meterage_raw);
+        $meterage = $this->normalize_meterage_value($meterage_raw);
 
-        if ($variation_id <= 0 || $meterage < 0.1) {
+        if ($variation_id <= 0 || $meterage < $this->get_meterage_min()) {
             wp_send_json_error(__('داده‌های نامعتبر.', 'woo-excel-mng'));
         }
 
@@ -1605,10 +1644,10 @@ class Woo_Excel_Mng_Frontend
 
         if ($meterage_raw !== null) {
             $meterage_raw = $this->normalize_decimal_input($meterage_raw);
-            $meterage = floatval($meterage_raw);
+            $meterage = $this->normalize_meterage_value($meterage_raw);
         }
 
-        if (empty($cart_item_key) || $meterage < 0.1) {
+        if (empty($cart_item_key) || $meterage < $this->get_meterage_min()) {
             wp_send_json_error(__('داده‌های نامعتبر.', 'woo-excel-mng'));
         }
 

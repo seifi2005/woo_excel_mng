@@ -7,6 +7,13 @@
     
     $(document).ready(function() {
 
+        var meterageMin = (typeof wooExcelMngFrontend !== 'undefined' && wooExcelMngFrontend.meterage_min)
+            ? parseFloat(wooExcelMngFrontend.meterage_min)
+            : 0.1;
+        var meterageStep = (typeof wooExcelMngFrontend !== 'undefined' && wooExcelMngFrontend.meterage_step)
+            ? parseFloat(wooExcelMngFrontend.meterage_step)
+            : 0.01;
+
         // نرمال‌سازی ورودی اعشاری (پشتیبانی از ارقام فارسی/عربی)
         function normalizeDecimalInput(value) {
             if (value === null || value === undefined) {
@@ -27,13 +34,27 @@
             });
         }
 
+        // نرمال‌سازی متراژ بر اساس گام
+        function normalizeMeterageValue(value) {
+            var meterage = parseFloat(value);
+            if (isNaN(meterage)) {
+                return meterage;
+            }
+
+            if (meterageStep > 0) {
+                meterage = Math.round(meterage / meterageStep) * meterageStep;
+            }
+
+            return parseFloat(meterage.toFixed(2));
+        }
+
         // اعمال تنظیمات اعشاری روی ورودی تعداد در صفحه محصول (حتی قبل از انتخاب وارییشن)
         if (typeof wooExcelMngFrontend !== 'undefined' && wooExcelMngFrontend.has_formula_product) {
             var $productQtyInput = $('.quantity input.qty');
             if ($productQtyInput.length) {
                 $productQtyInput.attr({
-                    'step': '0.01',
-                    'min': '0.1',
+                    'step': meterageStep,
+                    'min': meterageMin,
                     'inputmode': 'decimal'
                 });
             }
@@ -68,8 +89,8 @@
 
             // تنظیم step و min برای مقدار اعشاری
             $quantityInput.attr({
-                'step': '0.01',
-                'min': '0.1',
+                'step': meterageStep,
+                'min': meterageMin,
                 'inputmode': 'decimal'
             });
 
@@ -109,21 +130,14 @@
             clearTimeout(calculationTimeout);
             
             // بررسی اعتبار - پشتیبانی از مقادیر اعشاری
-            var meterage = parseFloat(meterageValue);
-            if (isNaN(meterage) || meterage < 0.1) {
+            var meterage = normalizeMeterageValue(meterageValue);
+            if (isNaN(meterage) || meterage < meterageMin) {
                 $('.woo-excel-price-preview').hide();
                 return;
             }
             
             // بررسی اینکه مقدار اعشاری معتبر است (حداکثر 2 رقم اعشار)
-            if (meterageValue.indexOf('.') !== -1) {
-                var decimalPart = meterageValue.split('.')[1];
-                if (decimalPart && decimalPart.length > 2) {
-                    // محدود کردن به 2 رقم اعشار
-                    meterage = parseFloat(meterage.toFixed(2));
-                    $input.val(meterage.toFixed(2));
-                }
-            }
+            $input.val(meterage.toFixed(2));
             
             // دریافت Variation ID
             var variationId = $('input[name="variation_id"]').val();
@@ -188,21 +202,13 @@
                     meterageValue = normalizedValue;
                 }
 
-                var meterage = parseFloat(meterageValue);
+                var meterage = normalizeMeterageValue(meterageValue);
                 
-                if (isNaN(meterage) || meterage < 0.1) {
+                if (isNaN(meterage) || meterage < meterageMin) {
                     e.preventDefault();
                     alert(wooExcelMngFrontend.strings.enter_meterage || 'لطفاً متراژ را وارد کنید.');
                     $quantityInput.focus();
                     return false;
-                }
-                
-                // محدود کردن به 2 رقم اعشار
-                if (meterageValue.indexOf('.') !== -1) {
-                    var decimalPart = meterageValue.split('.')[1];
-                    if (decimalPart && decimalPart.length > 2) {
-                        meterage = parseFloat(meterage.toFixed(2));
-                    }
                 }
 
             // مدل جدید: quantity باید integer باشد => 1
@@ -229,8 +235,8 @@
                 if ($row.find('.woo-excel-meterage-display').length > 0) {
                     // تنظیم step و min برای جلوگیری از گرد شدن
                     $input.attr({
-                        'step': '0.01',
-                        'min': '0.1',
+                        'step': meterageStep,
+                        'min': meterageMin,
                         'type': 'number'
                     });
                 }
@@ -277,11 +283,11 @@
                 $input.val(normalizedValue);
                 meterageValue = normalizedValue;
             }
-            var meterage = parseFloat(meterageValue);
+            var meterage = normalizeMeterageValue(meterageValue);
             
             // بررسی اعتبار
-            if (isNaN(meterage) || meterage < 0.1) {
-                alert('متراژ باید حداقل 0.1 متر باشد.');
+            if (isNaN(meterage) || meterage < meterageMin) {
+                alert('متراژ باید حداقل ' + meterageMin + ' متر باشد.');
                 var oldValue = $input.data('old-value');
                 if (oldValue) {
                     $input.val(oldValue);
@@ -294,14 +300,8 @@
             // ذخیره مقدار قبلی
             $input.data('old-value', meterageValue);
             
-            // محدود کردن به 2 رقم اعشار (فقط برای نمایش)
-            if (meterageValue.indexOf('.') !== -1) {
-                var decimalPart = meterageValue.split('.')[1];
-                if (decimalPart && decimalPart.length > 2) {
-                    meterage = parseFloat(meterage.toFixed(2));
-                    $input.val(meterage.toFixed(2));
-                }
-            }
+            // به‌روزرسانی نمایش بر اساس گام
+            $input.val(meterage.toFixed(2));
             
             // پاک کردن timeout قبلی
             clearTimeout(updateCartTimeout);
