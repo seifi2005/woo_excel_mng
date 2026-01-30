@@ -102,14 +102,17 @@ class Woo_Excel_Mng_Frontend
         // تغییر label quantity در صفحه محصول برای محصولات با فرمول
         add_action('woocommerce_before_add_to_cart_quantity', array($this, 'add_quantity_label'), 10);
 
-        // نمایش بلاک اطلاعات حمل‌ونقل (وزن، هزینه، نوع وسیله) برای کل سبد خرید
-        add_action('woocommerce_after_cart_table', array($this, 'display_shipping_info_box'), 10);
+        // نمایش جمع وزن زیر فاکتور سبد خرید
+        add_action('woocommerce_cart_totals_after_order_total', array($this, 'render_total_weight_row'), 10);
 
         // اضافه کردن script برای تنظیم step و min در cart
         add_action('wp_footer', array($this, 'add_cart_quantity_script'), 99);
 
         // بارگذاری اسکریپت‌ها و استایل‌ها
         add_action('wp_enqueue_scripts', array($this, 'enqueue_frontend_assets'));
+
+        // غیرفعال کردن کد تخفیف در سبد خرید
+        add_filter('woocommerce_coupons_enabled', array($this, 'disable_cart_coupons'), 10, 1);
     }
 
     /**
@@ -648,6 +651,43 @@ class Woo_Excel_Mng_Frontend
         }
 
         return $product_name;
+    }
+
+    /**
+     * نمایش جمع وزن زیر فاکتور
+     */
+    public function render_total_weight_row()
+    {
+        if (!WC()->cart || WC()->cart->is_empty()) {
+            return;
+        }
+
+        $total_weight = 0;
+        foreach (WC()->cart->get_cart() as $cart_item) {
+            if (isset($cart_item['woo_excel_calculated_weight'])) {
+                $total_weight += floatval($cart_item['woo_excel_calculated_weight']);
+                continue;
+            }
+
+            $product = isset($cart_item['data']) ? $cart_item['data'] : null;
+            if (!$product) {
+                continue;
+            }
+
+            $meterage = isset($cart_item[self::CART_ITEM_METERAGE_KEY])
+                ? floatval($cart_item[self::CART_ITEM_METERAGE_KEY])
+                : (isset($cart_item['quantity']) ? floatval($cart_item['quantity']) : 1);
+
+            $product_weight = floatval($product->get_weight());
+            if ($product_weight > 0) {
+                $total_weight += $product_weight * $meterage;
+            }
+        }
+
+        echo '<tr class="woo-excel-total-weight">';
+        echo '<th>' . esc_html__('جمع وزن', 'woo-excel-mng') . '</th>';
+        echo '<td data-title="' . esc_attr__('جمع وزن', 'woo-excel-mng') . '">' . wc_format_weight($total_weight) . '</td>';
+        echo '</tr>';
     }
 
     /**
@@ -1802,5 +1842,17 @@ class Woo_Excel_Mng_Frontend
             $city = sanitize_text_field($_POST['woo_excel_destination_city']);
             update_post_meta($order_id, '_woo_excel_destination_city', $city);
         }
+    }
+
+    /**
+     * غیرفعال کردن کد تخفیف در سبد خرید
+     */
+    public function disable_cart_coupons($enabled)
+    {
+        if (function_exists('is_cart') && is_cart()) {
+            return false;
+        }
+
+        return $enabled;
     }
 }
