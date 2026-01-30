@@ -1,0 +1,185 @@
+<?php
+/**
+ * کلاس مدیریت حمل‌ونقل
+ */
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+class Woo_Excel_Mng_Shipping {
+    
+    /**
+     * واردسازی مسیرهای حمل‌ونقل از داده‌های Excel
+     */
+    public static function import_routes($routes_data) {
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'woo_excel_shipping_routes';
+        
+        $inserted = 0;
+        $updated = 0;
+        $errors = array();
+        
+        foreach ($routes_data as $route) {
+            try {
+                // بررسی وجود مسیر
+                $existing = $wpdb->get_row($wpdb->prepare(
+                    "SELECT id FROM $table_name WHERE origin_city = %s AND destination_city = %s",
+                    $route['origin_city'],
+                    $route['destination_city']
+                ));
+                
+                if ($existing) {
+                    // به‌روزرسانی
+                    $result = $wpdb->update(
+                        $table_name,
+                        array(
+                            'peykan_price' => $route['peykan_price'],
+                            'mazda_price' => $route['mazda_price'],
+                            'nissan_price' => $route['nissan_price'],
+                        ),
+                        array('id' => $existing->id),
+                        array('%f', '%f', '%f'),
+                        array('%d')
+                    );
+                    
+                    if ($result !== false) {
+                        $updated++;
+                    } else {
+                        $errors[] = sprintf(
+                            __('خطا در به‌روزرسانی مسیر %s → %s', 'woo-excel-mng'),
+                            $route['origin_city'],
+                            $route['destination_city']
+                        );
+                    }
+                } else {
+                    // درج جدید
+                    $result = $wpdb->insert(
+                        $table_name,
+                        array(
+                            'origin_city' => $route['origin_city'],
+                            'destination_city' => $route['destination_city'],
+                            'peykan_price' => $route['peykan_price'],
+                            'mazda_price' => $route['mazda_price'],
+                            'nissan_price' => $route['nissan_price'],
+                            'is_active' => 1
+                        ),
+                        array('%s', '%s', '%f', '%f', '%f', '%d')
+                    );
+                    
+                    if ($result) {
+                        $inserted++;
+                    } else {
+                        $errors[] = sprintf(
+                            __('خطا در درج مسیر %s → %s', 'woo-excel-mng'),
+                            $route['origin_city'],
+                            $route['destination_city']
+                        );
+                    }
+                }
+                
+            } catch (Exception $e) {
+                $errors[] = sprintf(
+                    __('خطا در پردازش مسیر %s → %s: %s', 'woo-excel-mng'),
+                    $route['origin_city'],
+                    $route['destination_city'],
+                    $e->getMessage()
+                );
+            }
+        }
+        
+        return array(
+            'success' => empty($errors),
+            'inserted' => $inserted,
+            'updated' => $updated,
+            'errors' => $errors
+        );
+    }
+    
+    /**
+     * ذخیره مسیر (از طریق AJAX)
+     */
+    public static function save_route($route_id, $data) {
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'woo_excel_shipping_routes';
+        
+        $result = $wpdb->update(
+            $table_name,
+            array(
+                'peykan_price' => floatval($data['peykan_price']),
+                'mazda_price' => floatval($data['mazda_price']),
+                'nissan_price' => floatval($data['nissan_price']),
+                'is_active' => intval($data['is_active'])
+            ),
+            array('id' => intval($route_id)),
+            array('%f', '%f', '%f', '%d'),
+            array('%d')
+        );
+        
+        return $result !== false;
+    }
+    
+    /**
+     * محاسبه هزینه حمل‌ونقل
+     */
+    public static function calculate_shipping_cost($origin_city, $destination_city, $total_weight) {
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'woo_excel_shipping_routes';
+        
+        // یافتن مسیر
+        $route = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM $table_name 
+             WHERE origin_city = %s 
+             AND destination_city = %s 
+             AND is_active = 1",
+            $origin_city,
+            $destination_city
+        ));
+        
+        if (!$route) {
+            return null;
+        }
+        
+        // تعیین وسیله نقلیه بر اساس وزن
+        $vehicle = self::select_vehicle($total_weight);
+        
+        $cost = 0;
+        switch ($vehicle) {
+            case 'peykan':
+                $cost = floatval($route->peykan_price);
+                break;
+            case 'mazda':
+                $cost = floatval($route->mazda_price);
+                break;
+            case 'nissan':
+                $cost = floatval($route->nissan_price);
+                break;
+        }
+        
+        return array(
+            'vehicle' => $vehicle,
+            'cost' => $cost
+        );
+    }
+    
+    /**
+     * انتخاب وسیله نقلیه بر اساس وزن
+     */
+    public static function select_vehicle($weight) {
+        if ($weight <= 200) {
+            return 'peykan';
+        } elseif ($weight <= 500) {
+            return 'mazda';
+        } else {
+            return 'nissan';
+        }
+    }
+    
+    /**
+     * بررسی آستانه حمل رایگان
+     */
+    public static function check_free_shipping($cart_total) {
+        $threshold = get_option('woo_excel_mng_free_shipping_threshold', 20000000);
+        return $cart_total >= $threshold;
+    }
+}

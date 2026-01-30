@@ -1,0 +1,441 @@
+/**
+ * استایل‌های Front-end افزونه
+ */
+
+/* ===== فیلد متراژ در صفحه محصول ===== */
+.woo-excel-mng-meterage-wrapper {
+    margin: 20px 0;
+    padding: 15px;
+    background: #f9f9f9;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+}
+
+.woo-excel-mng-meterage-wrapper .form-row {
+    margin-bottom: 0;
+}
+
+.woo-excel-mng-meterage-wrapper label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #333;
+}
+
+.woo-excel-mng-meterage-wrapper .required {
+    color: #d63638;
+}
+
+.woo-excel-meterage-input {
+    width: 100%;
+    max-width: 200px;
+    padding: 10px;
+    border: 1px solid #8c8f94;
+    border-radius: 4px;
+    font-size: 16px;
+}
+
+.woo-excel-meterage-input:focus {
+    border-color: #2271b1;
+    outline: none;
+    box-shadow: 0 0 0 1px #2271b1;
+}
+
+.woo-excel-price-preview {
+    display: block;
+    margin-top: 10px;
+    padding: 10px;
+    background: #e8f5e9;
+    border: 1px solid #4caf50;
+    border-radius: 4px;
+    color: #2e7d32;
+}
+
+.woo-excel-calculated-price {
+    font-size: 18px;
+    font-weight: 700;
+    color: #1b5e20;
+    margin-right: 5px;
+}
+
+/* ===== بلاک اطلاع‌رسانی حمل رایگان ===== */
+.woo-excel-free-shipping-notice {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 30px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.woo-excel-free-shipping-notice.woo-excel-free-shipping-achieved {
+    background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+}
+
+.woo-excel-free-shipping-notice p {
+    margin: 0 0 15px 0;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.woo-excel-free-shipping-notice .dashicons {
+    font-size: 24px;
+    width: 24px;
+    height: 24px;
+}
+
+.woo-excel-free-shipping-notice strong {
+    font-size: 18px;
+}
+
+/* نوار پیشرفت */
+.woo-excel-progress-bar {
+    width: 100%;
+    height: 8px;
+    background: rgba(255,255,255,0.3);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.woo-excel-progress-fill {
+    height: 100%;
+    background: #fff;
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+/* ===== نمایش متراژ در سبد خرید ===== */
+.woocommerce-cart .cart_item .product-name small {
+    display: block;
+    color: #646970;
+    font-size: 13px;
+    margin-top: 5px;
+}
+
+/* ===== بلاک اطلاعات حمل‌ونقل در سبد خرید ===== */
+.woo-excel-shipping-info-box {
+    background: #fff;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 25px;
+    margin: 30px 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.woo-excel-shipping-info-box h3 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #f0f0f0;
+    color: #333;
+    font-size: 20px;
+}
+
+.woo-excel-destination-selector {
+    margin-bottom: 25px;
+}
+
+.woo-excel-destination-selector label {
+    display: block;
+    margin-bottom: 10px;
+    font-size: 16px;
+    color: #333;
+}
+
+.woo-excel-city-select {
+    width: 100%;
+    max-width: 300px;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 16px;
+    background: #fff;
+}
+
+.woo-excel-city-select:focus {
+    border-color: #2271b1;
+    outline: none;
+    box-shadow: 0 0 0 1px #2271b1;
+}
+
+.woo-excel-items-weights {
+    margin-bottom: 25px;
+}
+
+.woo-excel-items-weights h4 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 16px;
+    color: #555;
+}
+
+.woo-excel-weights-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #f9f9f9;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.woo-excel-weights-table thead {
+    background: #e0e0e0;
+}
+
+.woo-excel-weights-table th,
+.woo-excel-weights-table td {
+    padding: 12px 15px;
+    text-align: right;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.woo-excel-weights-table tbody tr:hover {
+    background: #f5f5f5;
+}
+
+.woo-excel-weights-table .total-weight-row {
+    background: #fff;
+    border-top: 2px solid #333;
+    font-weight: bold;
+}
+
+.woo-excel-weights-table .weight-value {
+    text-align: left;
+    font-family: monospace;
+}
+
+.woo-excel-shipping-details {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 2px solid #f0f0f0;
+}
+
+.woo-excel-free-shipping-badge {
+    background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+    color: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.woo-excel-free-shipping-badge .dashicons {
+    font-size: 32px;
+    width: 32px;
+    height: 32px;
+    margin-bottom: 10px;
+}
+
+.woo-excel-free-shipping-badge strong {
+    display: block;
+    font-size: 20px;
+    margin-bottom: 10px;
+}
+
+.woo-excel-shipping-info {
+    background: #f9f9f9;
+    padding: 20px;
+    border-radius: 8px;
+}
+
+.woo-excel-shipping-info p {
+    margin: 15px 0;
+    font-size: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.woo-excel-shipping-info .vehicle-name {
+    font-weight: bold;
+    color: #2271b1;
+    font-size: 18px;
+}
+
+.woo-excel-shipping-info .shipping-cost {
+    font-weight: bold;
+    color: #d63638;
+    font-size: 18px;
+}
+
+.woo-excel-free-shipping-progress {
+    margin-top: 20px;
+    padding: 15px;
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+}
+
+.woo-excel-free-shipping-progress p {
+    margin: 0 0 10px 0;
+    font-size: 14px;
+    color: #555;
+}
+
+.woo-excel-free-shipping-progress .progress-text {
+    margin-top: 10px;
+    font-size: 12px;
+    color: #888;
+    text-align: center;
+}
+
+.woo-excel-select-city-notice {
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 4px;
+    padding: 15px;
+    text-align: center;
+    color: #856404;
+}
+
+.woo-excel-no-route {
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+    border-radius: 4px;
+    padding: 15px;
+    text-align: center;
+    color: #721c24;
+}
+
+/* ===== استایل‌های جدول جزئیات آیتم‌ها ===== */
+.woo-excel-weights-table {
+    font-size: 14px;
+}
+
+.woo-excel-weights-table th {
+    background: #f0f0f0;
+    font-weight: 600;
+    padding: 12px 10px;
+    text-align: right;
+    border-bottom: 2px solid #ddd;
+}
+
+.woo-excel-weights-table td {
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.woo-excel-weights-table .meterage-value {
+    font-family: monospace;
+    font-weight: 500;
+    color: #2271b1;
+}
+
+.woo-excel-weights-table tbody tr:hover {
+    background: #f9f9f9;
+}
+
+.woo-excel-weights-table .total-weight-row {
+    background: #fff;
+    border-top: 2px solid #333;
+    font-weight: bold;
+}
+
+/* ===== استایل‌های بخش Premium ===== */
+.woo-excel-premium-suggestion {
+    background: #fff3cd;
+    border: 2px solid #ffc107;
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 20px;
+}
+
+.woo-excel-premium-suggestion .premium-notice {
+    font-size: 18px;
+    margin-bottom: 15px;
+    color: #856404;
+}
+
+.woo-excel-premium-suggestion p {
+    margin: 10px 0;
+    font-size: 15px;
+    line-height: 1.6;
+    color: #856404;
+}
+
+.woo-excel-premium-suggestion .premium-details {
+    font-size: 13px;
+    color: #856404;
+    opacity: 0.9;
+    font-style: italic;
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid rgba(133, 100, 4, 0.3);
+}
+
+.woo-excel-premium-suggestion .premium-remaining {
+    font-size: 16px;
+    font-weight: bold;
+    color: #d63638;
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid rgba(133, 100, 4, 0.3);
+}
+
+.woo-excel-premium-suggestion strong {
+    color: #856404;
+}
+
+/* ===== ریسپانسیو برای جدول ===== */
+@media (max-width: 768px) {
+    .woo-excel-weights-table {
+        font-size: 12px;
+    }
+    
+    .woo-excel-weights-table th,
+    .woo-excel-weights-table td {
+        padding: 8px 5px;
+    }
+    
+    .woo-excel-premium-suggestion {
+        padding: 15px;
+    }
+    
+    .woo-excel-premium-suggestion p {
+        font-size: 14px;
+    }
+}
+
+/* ===== حالت به‌روزرسانی در سبد خرید ===== */
+.woo-excel-updating {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.woo-excel-updating::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.8);
+    z-index: 1;
+}
+
+/* ===== تغییر label quantity در سبد خرید ===== */
+table.cart .quantity label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+}
+
+table.cart .woo-excel-meterage-quantity + label::before {
+    content: 'متراژ (متر): ';
+}
+
+/* ===== ریسپانسیو ===== */
+@media (max-width: 768px) {
+    .woo-excel-meterage-input {
+        max-width: 100%;
+    }
+    
+    .woo-excel-free-shipping-notice {
+        padding: 15px;
+    }
+    
+    .woo-excel-free-shipping-notice p {
+        font-size: 14px;
+    }
+}
+
