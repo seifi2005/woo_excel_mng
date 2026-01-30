@@ -114,6 +114,17 @@ class Woo_Excel_Mng_Frontend
             return;
         }
 
+        $has_formula_product = false;
+        if (function_exists('is_product') && is_product() && function_exists('wc_get_product')) {
+            $product = wc_get_product(get_the_ID());
+            if ($product instanceof WC_Product_Variation) {
+                $parent_id = $product->get_parent_id();
+                $has_formula_product = (bool) Woo_Excel_Mng_Formulas::get_product_formula($parent_id);
+            } elseif ($product instanceof WC_Product) {
+                $has_formula_product = (bool) Woo_Excel_Mng_Formulas::get_product_formula($product->get_id());
+            }
+        }
+
         wp_enqueue_style(
             'woo-excel-mng-frontend',
             WOO_EXCEL_MNG_PLUGIN_URL . 'frontend/assets/css/frontend.css',
@@ -132,6 +143,7 @@ class Woo_Excel_Mng_Frontend
         wp_localize_script('woo-excel-mng-frontend', 'wooExcelMngFrontend', array(
             'ajax_url' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('woo_excel_mng_frontend_nonce'),
+            'has_formula_product' => $has_formula_product,
             'strings' => array(
                 'enter_meterage' => __('لطفاً متراژ را وارد کنید.', 'woo-excel-mng'),
                 'calculating' => __('در حال محاسبه...', 'woo-excel-mng'),

@@ -26,6 +26,18 @@
                 return Object.prototype.hasOwnProperty.call(map, ch) ? map[ch] : ch;
             });
         }
+
+        // اعمال تنظیمات اعشاری روی ورودی تعداد در صفحه محصول (حتی قبل از انتخاب وارییشن)
+        if (typeof wooExcelMngFrontend !== 'undefined' && wooExcelMngFrontend.has_formula_product) {
+            var $productQtyInput = $('.quantity input.qty');
+            if ($productQtyInput.length) {
+                $productQtyInput.attr({
+                    'step': '0.01',
+                    'min': '0.1',
+                    'inputmode': 'decimal'
+                });
+            }
+        }
         
         // ===== مدیریت فیلد quantity (متراژ) در صفحه محصول =====
         // تغییر label quantity به متراژ فقط برای وارییشن‌هایی که فرمول دارند
