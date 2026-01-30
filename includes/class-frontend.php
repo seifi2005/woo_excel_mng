@@ -157,7 +157,8 @@ class Woo_Excel_Mng_Frontend
             return (bool) Woo_Excel_Mng_Formulas::get_product_formula($product->get_id());
         }
 
-        return false;
+        // برای سایر نوع‌ها، اگر فرمول تعریف شده باشد true است
+        return (bool) Woo_Excel_Mng_Formulas::get_product_formula($product->get_id());
     }
 
     /**
@@ -385,11 +386,22 @@ class Woo_Excel_Mng_Frontend
      */
     public function change_quantity_label($args, $product)
     {
-        if (!$product && function_exists('wc_get_product')) {
-            $product = wc_get_product(get_the_ID());
+        $target_product_id = 0;
+
+        if ($product instanceof WC_Product_Variation) {
+            $target_product_id = $product->get_parent_id();
+        } elseif ($product instanceof WC_Product) {
+            $target_product_id = $product->get_id();
+        } elseif (function_exists('is_product') && is_product()) {
+            $target_product_id = get_the_ID();
         }
 
-        if ($product && $this->is_formula_product($product)) {
+        $has_formula = false;
+        if ($target_product_id) {
+            $has_formula = (bool) Woo_Excel_Mng_Formulas::get_product_formula($target_product_id);
+        }
+
+        if ($has_formula) {
             $args['input_name'] = 'quantity';
             $args['min_value'] = 0.1;
             $args['step'] = 0.01;
