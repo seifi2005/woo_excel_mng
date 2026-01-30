@@ -385,18 +385,20 @@ class Woo_Excel_Mng_Frontend
      */
     public function change_quantity_label($args, $product)
     {
-        if ($product && $product->is_type('variable')) {
-            $formula = Woo_Excel_Mng_Formulas::get_product_formula($product->get_id());
-            if ($formula) {
-                $args['input_name'] = 'quantity';
-                $args['min_value'] = 0.1;
-                $args['step'] = 0.01;
-                // اضافه کردن label سفارشی
-                if (!isset($args['classes'])) {
-                    $args['classes'] = array();
-                }
-                $args['classes'][] = 'woo-excel-meterage-quantity';
+        if (!$product && function_exists('wc_get_product')) {
+            $product = wc_get_product(get_the_ID());
+        }
+
+        if ($product && $this->is_formula_product($product)) {
+            $args['input_name'] = 'quantity';
+            $args['min_value'] = 0.1;
+            $args['step'] = 0.01;
+            $args['inputmode'] = 'decimal';
+            // اضافه کردن label سفارشی
+            if (!isset($args['classes'])) {
+                $args['classes'] = array();
             }
+            $args['classes'][] = 'woo-excel-meterage-quantity';
         }
         return $args;
     }
