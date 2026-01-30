@@ -121,6 +121,12 @@
     margin-top: 5px;
 }
 
+.woo-excel-unit-price {
+    color: #646970;
+    font-size: 12px;
+    font-weight: 400;
+}
+
 /* ===== بلاک اطلاعات حمل‌ونقل در سبد خرید ===== */
 .woo-excel-shipping-info-box {
     background: #fff;

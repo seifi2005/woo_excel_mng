@@ -1044,6 +1044,17 @@ class Woo_Excel_Mng_Frontend
     {
         if (isset($cart_item['woo_excel_calculated_price'])) {
             $calculated_price = floatval($cart_item['woo_excel_calculated_price']);
+            $meterage = isset($cart_item[self::CART_ITEM_METERAGE_KEY]) ? floatval($cart_item[self::CART_ITEM_METERAGE_KEY]) : 0;
+
+            if ($meterage > 0) {
+                $unit_price = $calculated_price / $meterage;
+                return sprintf(
+                    '%s <small class="woo-excel-unit-price">/ %s</small>',
+                    woo_excel_mng_format_price($unit_price),
+                    esc_html__('متر', 'woo-excel-mng')
+                );
+            }
+
             return woo_excel_mng_format_price($calculated_price);
         }
 
