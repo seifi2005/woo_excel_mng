@@ -12,6 +12,7 @@ class Woo_Excel_Mng_Frontend
 {
 
     const CART_ITEM_METERAGE_KEY = 'woo_excel_meterage';
+    private static $skip_cart_id_filter = false;
 
     /**
      * سازنده
@@ -25,6 +26,10 @@ class Woo_Excel_Mng_Frontend
         // تغییر label quantity در صفحه محصول
         add_filter('woocommerce_quantity_input_args', array($this, 'change_quantity_label'), 10, 2);
         add_filter('woocommerce_quantity_input', array($this, 'render_custom_quantity_input'), 10, 3);
+
+        // جلوگیری از ایجاد آیتم تکراری بر اساس متراژ
+        add_filter('woocommerce_cart_id', array($this, 'filter_cart_id'), 10, 5);
+        add_action('woocommerce_add_to_cart', array($this, 'merge_meterage_on_add_to_cart'), 10, 6);
 
         // تغییر quantity input در سبد خرید برای محصولات با فرمول (فقط Cart کلاسیک)
         add_filter('woocommerce_quantity_input_args', array($this, 'change_cart_quantity_input'), 10, 2);
@@ -203,6 +208,83 @@ class Woo_Excel_Mng_Frontend
     }
 
     /**
+     * محاسبه کلید سبد خرید بدون در نظر گرفتن متراژ
+     */
+    public function filter_cart_id($cart_id, $product_id, $variation_id, $variation, $cart_item_data)
+    {
+        if (self::$skip_cart_id_filter) {
+            return $cart_id;
+        }
+
+        if (!isset($cart_item_data[self::CART_ITEM_METERAGE_KEY])) {
+            return $cart_id;
+        }
+
+        $data = $cart_item_data;
+        unset($data[self::CART_ITEM_METERAGE_KEY]);
+        unset($data['woo_excel_unique']);
+
+        if (function_exists('WC') && WC()->cart) {
+            try {
+                self::$skip_cart_id_filter = true;
+                $new_id = WC()->cart->generate_cart_id($product_id, $variation_id, $variation, $data);
+                return $new_id;
+            } finally {
+                self::$skip_cart_id_filter = false;
+            }
+        }
+
+        return $cart_id;
+    }
+
+    /**
+     * ادغام متراژ هنگام افزودن به سبد خرید
+     */
+    public function merge_meterage_on_add_to_cart($cart_item_key, $product_id, $quantity, $variation_id, $variation, $cart_item_data)
+    {
+        if (!$variation_id) {
+            return;
+        }
+
+        $variation_product = wc_get_product($variation_id);
+        if (!$variation_product || !$this->is_formula_product($variation_product)) {
+            return;
+        }
+
+        $incoming_meterage = 0;
+        if (isset($cart_item_data[self::CART_ITEM_METERAGE_KEY])) {
+            $incoming_meterage = floatval($cart_item_data[self::CART_ITEM_METERAGE_KEY]);
+        } elseif (isset($_REQUEST[self::CART_ITEM_METERAGE_KEY])) {
+            $incoming_meterage = floatval($this->normalize_decimal_input($_REQUEST[self::CART_ITEM_METERAGE_KEY]));
+        } elseif (isset($_REQUEST['meterage'])) {
+            $incoming_meterage = floatval($this->normalize_decimal_input($_REQUEST['meterage']));
+        } elseif (isset($_REQUEST['quantity'])) {
+            $incoming_meterage = floatval($this->normalize_decimal_input($_REQUEST['quantity']));
+        }
+
+        if ($incoming_meterage <= 0) {
+            return;
+        }
+
+        $cart = WC()->cart;
+        $cart_item = $cart ? $cart->get_cart_item($cart_item_key) : null;
+        if (!$cart_item) {
+            return;
+        }
+
+        $existing_meterage = isset($cart_item[self::CART_ITEM_METERAGE_KEY])
+            ? floatval($cart_item[self::CART_ITEM_METERAGE_KEY])
+            : 0;
+
+        $new_meterage = $existing_meterage > 0
+            ? $existing_meterage + $incoming_meterage
+            : $incoming_meterage;
+
+        $cart->cart_contents[$cart_item_key][self::CART_ITEM_METERAGE_KEY] = $new_meterage;
+        $cart->cart_contents[$cart_item_key]['quantity'] = 1;
+    }
+
+    /**
      * افزودن flag فرمول به داده‌های variation برای JS
      */
     public function add_variation_formula_flag($variation_data, $product, $variation)
@@ -253,8 +335,6 @@ class Woo_Excel_Mng_Frontend
 
         if ($meterage !== null && $meterage >= 0.1) {
             $cart_item_data[self::CART_ITEM_METERAGE_KEY] = $meterage;
-            // کلید یکتا برای جلوگیری از merge شدن آیتم‌ها
-            $cart_item_data['woo_excel_unique'] = md5($variation_id . '|' . $meterage . '|' . wp_rand());
         }
 
         return $cart_item_data;
