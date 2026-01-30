@@ -24,6 +24,7 @@ class Woo_Excel_Mng_Frontend
 
         // تغییر label quantity در صفحه محصول
         add_filter('woocommerce_quantity_input_args', array($this, 'change_quantity_label'), 10, 2);
+        add_filter('woocommerce_quantity_input', array($this, 'render_custom_quantity_input'), 10, 3);
 
         // تغییر quantity input در سبد خرید برای محصولات با فرمول (فقط Cart کلاسیک)
         add_filter('woocommerce_quantity_input_args', array($this, 'change_cart_quantity_input'), 10, 2);
@@ -425,6 +426,48 @@ class Woo_Excel_Mng_Frontend
             $args['classes'][] = 'woo-excel-meterage-quantity';
         }
         return $args;
+    }
+
+    /**
+     * رندر ورودی سفارشی متراژ برای محصولات دارای فرمول
+     */
+    public function render_custom_quantity_input($html, $product = null, $args = array())
+    {
+        if (!function_exists('is_product') || !is_product()) {
+            return $html;
+        }
+
+        if (!is_array($args)) {
+            $args = array();
+        }
+
+        $product_id = 0;
+        if ($product instanceof WC_Product_Variation) {
+            $product_id = $product->get_parent_id();
+        } elseif ($product instanceof WC_Product) {
+            $product_id = $product->get_id();
+        } else {
+            $product_id = get_the_ID();
+        }
+
+        if (!$product_id || !Woo_Excel_Mng_Formulas::get_product_formula($product_id)) {
+            return $html;
+        }
+
+        $input_id = isset($args['input_id']) ? $args['input_id'] : 'woo_excel_meterage';
+        $input_value = isset($args['input_value']) ? $args['input_value'] : 1;
+        $input_value = $input_value ? $input_value : 1;
+
+        $label = esc_html__('متراژ (متر)', 'woo-excel-mng');
+        $html  = '<div class="quantity">';
+        $html .= '<label class="screen-reader-text" for="' . esc_attr($input_id) . '">' . $label . '</label>';
+        $html .= '<input type="text" id="' . esc_attr($input_id) . '" class="input-text qty text woo-excel-meterage-quantity" ';
+        $html .= 'name="woo_excel_meterage" value="' . esc_attr($input_value) . '" ';
+        $html .= 'inputmode="decimal" autocomplete="off" />';
+        $html .= '<input type="hidden" name="quantity" value="1" />';
+        $html .= '</div>';
+
+        return $html;
     }
 
     /**

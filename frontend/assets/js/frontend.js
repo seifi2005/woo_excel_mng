@@ -205,11 +205,17 @@
                     }
                 }
 
-                // مدل جدید: quantity باید integer باشد => 1
-                // متراژ را جداگانه ارسال می‌کنیم
+            // مدل جدید: quantity باید integer باشد => 1
+            // اگر ورودی سفارشی است، همان را نگه دار
+            if ($quantityInput.attr('name') === 'woo_excel_meterage') {
+                if ($(this).find('input[name="quantity"]').length === 0) {
+                    $(this).append('<input type="hidden" name="quantity" value="1">');
+                }
+            } else {
                 $(this).find('input[name="woo_excel_meterage"]').remove();
                 $(this).append('<input type="hidden" name="woo_excel_meterage" value="' + meterage.toFixed(2) + '">');
                 $quantityInput.val('1');
+            }
             }
         });
         
