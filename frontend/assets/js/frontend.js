@@ -6,6 +6,26 @@
     'use strict';
     
     $(document).ready(function() {
+
+        // نرمال‌سازی ورودی اعشاری (پشتیبانی از ارقام فارسی/عربی)
+        function normalizeDecimalInput(value) {
+            if (value === null || value === undefined) {
+                return '';
+            }
+
+            var str = String(value).replace(/\s+/g, '');
+            var map = {
+                '۰': '0', '۱': '1', '۲': '2', '۳': '3', '۴': '4',
+                '۵': '5', '۶': '6', '۷': '7', '۸': '8', '۹': '9',
+                '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
+                '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9',
+                '٫': '.', ',': '.', '٬': ''
+            };
+
+            return str.replace(/[۰-۹٠-٩٫٬,]/g, function(ch) {
+                return Object.prototype.hasOwnProperty.call(map, ch) ? map[ch] : ch;
+            });
+        }
         
         // ===== مدیریت فیلد quantity (متراژ) در صفحه محصول =====
         // تغییر label quantity به متراژ فقط برای وارییشن‌هایی که فرمول دارند
@@ -62,6 +82,11 @@
         $(document).on('input change', '.quantity input.qty', function() {
             var $input = $(this);
             var meterageValue = $input.val();
+            var normalizedValue = normalizeDecimalInput(meterageValue);
+            if (normalizedValue !== meterageValue) {
+                $input.val(normalizedValue);
+                meterageValue = normalizedValue;
+            }
 
             var $form = $('form.variations_form');
             if (!$form.length || !$form.data('woo_excel_has_formula')) {
@@ -145,6 +170,12 @@
             // فقط برای محصولات با فرمول
             if ($form.length && $form.data('woo_excel_has_formula') && $quantityInput.length) {
                 var meterageValue = $quantityInput.val();
+                var normalizedValue = normalizeDecimalInput(meterageValue);
+                if (normalizedValue !== meterageValue) {
+                    $quantityInput.val(normalizedValue);
+                    meterageValue = normalizedValue;
+                }
+
                 var meterage = parseFloat(meterageValue);
                 
                 if (isNaN(meterage) || meterage < 0.1) {
@@ -223,6 +254,11 @@
             }
             
             var meterageValue = $input.val();
+            var normalizedValue = normalizeDecimalInput(meterageValue);
+            if (normalizedValue !== meterageValue) {
+                $input.val(normalizedValue);
+                meterageValue = normalizedValue;
+            }
             var meterage = parseFloat(meterageValue);
             
             // بررسی اعتبار
