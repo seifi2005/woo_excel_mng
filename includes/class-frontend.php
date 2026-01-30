@@ -305,7 +305,7 @@ class Woo_Excel_Mng_Frontend
             $meterage = 1;
         }
 
-        $meterage_formatted = number_format($meterage, 2, '.', '');
+        $meterage_formatted = woo_excel_mng_format_number($meterage, 2, '.', '');
 
         $html  = '<div class="woo-excel-meterage-qty">';
         $html .= '<label class="screen-reader-text" for="woo-excel-meterage-' . esc_attr($cart_item_key) . '">' . esc_html__('متراژ (متر)', 'woo-excel-mng') . '</label>';
@@ -523,7 +523,7 @@ class Woo_Excel_Mng_Frontend
             $formula = Woo_Excel_Mng_Formulas::get_product_formula($parent_id);
             if ($formula) {
                 $meterage = isset($cart_item[self::CART_ITEM_METERAGE_KEY]) ? floatval($cart_item[self::CART_ITEM_METERAGE_KEY]) : 1;
-                $formatted_meterage = number_format($meterage, 2, '.', '');
+                $formatted_meterage = woo_excel_mng_format_number($meterage, 2, '.', '');
                 $product_name .= '<br><small class="woo-excel-meterage-display">' . sprintf(__('متراژ: %s متر', 'woo-excel-mng'), $formatted_meterage) . '</small>';
             }
         }
@@ -723,7 +723,7 @@ class Woo_Excel_Mng_Frontend
                         <?php foreach ($cart_items_details as $item): ?>
                             <tr>
                                 <td><?php echo esc_html($item['name']); ?></td>
-                                <td class="meterage-value"><?php echo number_format($item['meterage'], 2); ?> <?php _e('متر', 'woo-excel-mng'); ?></td>
+                                <td class="meterage-value"><?php echo esc_html(woo_excel_mng_format_number($item['meterage'], 2, '.', '')); ?> <?php _e('متر', 'woo-excel-mng'); ?></td>
                                 <td><?php echo esc_html($item['length'] ? $item['length'] : '-'); ?></td>
                                 <td><?php echo esc_html($item['color'] ? $item['color'] : '-'); ?></td>
                                 <td><?php echo esc_html($item['thickness'] ? $item['thickness'] : '-'); ?></td>
@@ -748,7 +748,7 @@ class Woo_Excel_Mng_Frontend
                             <span class="dashicons dashicons-yes-alt"></span>
                             <strong><?php _e('حمل رایگان!', 'woo-excel-mng'); ?></strong>
                             <?php if ($is_premium_mode): ?>
-                                <p><?php printf(__('هزینه حمل (%s) کمتر از %s%% مبلغ فاکتور (%s) است.', 'woo-excel-mng'), wc_price($base_shipping_cost), number_format($shipping_percentage * 100, 1), wc_price($shipping_percentage_amount)); ?></p>
+                                <p><?php printf(__('هزینه حمل (%s) کمتر از %s%% مبلغ فاکتور (%s) است.', 'woo-excel-mng'), woo_excel_mng_format_price($base_shipping_cost), number_format($shipping_percentage * 100, 1), woo_excel_mng_format_price($shipping_percentage_amount)); ?></p>
                             <?php else: ?>
                                 <p><?php _e('حمل شما رایگان است.', 'woo-excel-mng'); ?></p>
                             <?php endif; ?>
@@ -762,7 +762,7 @@ class Woo_Excel_Mng_Frontend
                                 </p>
                                 <p>
                                     <strong><?php _e('هزینه حمل:', 'woo-excel-mng'); ?></strong>
-                                    <span class="shipping-cost"><?php echo wc_price($shipping_cost); ?></span>
+                                    <span class="shipping-cost"><?php echo woo_excel_mng_format_price($shipping_cost); ?></span>
                                 </p>
 
                                 <?php if ($is_premium_mode && $target_amount > 0): ?>
@@ -775,7 +775,7 @@ class Woo_Excel_Mng_Frontend
                                             <?php
                                             printf(
                                                 __('اگر خرید خود را به %s برسانید، حمل رایگان می‌شود!', 'woo-excel-mng'),
-                                                '<strong>' . wc_price($target_amount) . '</strong>'
+                                                '<strong>' . woo_excel_mng_format_price($target_amount) . '</strong>'
                                             );
                                             ?>
                                         </p>
@@ -783,9 +783,9 @@ class Woo_Excel_Mng_Frontend
                                             <?php
                                             printf(
                                                 __('هزینه حمل (%s) = %s%% × مبلغ فاکتور → مبلغ هدف = %s', 'woo-excel-mng'),
-                                                wc_price($base_shipping_cost),
+                                                woo_excel_mng_format_price($base_shipping_cost),
                                                 number_format($shipping_percentage * 100, 1),
-                                                wc_price($target_amount)
+                                                woo_excel_mng_format_price($target_amount)
                                             );
                                             ?>
                                         </p>
@@ -794,7 +794,7 @@ class Woo_Excel_Mng_Frontend
                                             $remaining_for_free = $target_amount - $cart_total;
                                             printf(
                                                 __('%s دیگر تا حمل رایگان', 'woo-excel-mng'),
-                                                '<strong>' . wc_price($remaining_for_free) . '</strong>'
+                                                '<strong>' . woo_excel_mng_format_price($remaining_for_free) . '</strong>'
                                             );
                                             ?>
                                         </p>
@@ -811,7 +811,7 @@ class Woo_Excel_Mng_Frontend
                                             <p>
                                                 <?php printf(
                                                     __('%s دیگر تا حمل رایگان', 'woo-excel-mng'),
-                                                    wc_price($remaining)
+                                                    woo_excel_mng_format_price($remaining)
                                                 ); ?>
                                             </p>
                                             <div class="woo-excel-progress-bar">
@@ -820,8 +820,8 @@ class Woo_Excel_Mng_Frontend
                                             <p class="progress-text">
                                                 <?php printf(
                                                     __('مبلغ فعلی: %s / حد آستانه: %s', 'woo-excel-mng'),
-                                                    wc_price($cart_total),
-                                                    wc_price($free_shipping_threshold)
+                                                    woo_excel_mng_format_price($cart_total),
+                                                    woo_excel_mng_format_price($free_shipping_threshold)
                                                 ); ?>
                                             </p>
                                         </div>
@@ -1044,7 +1044,7 @@ class Woo_Excel_Mng_Frontend
     {
         if (isset($cart_item['woo_excel_calculated_price'])) {
             $calculated_price = floatval($cart_item['woo_excel_calculated_price']);
-            return wc_price($calculated_price);
+            return woo_excel_mng_format_price($calculated_price);
         }
 
         return $price;
@@ -1058,7 +1058,7 @@ class Woo_Excel_Mng_Frontend
         if (isset($cart_item['woo_excel_calculated_price'])) {
             $calculated_price = floatval($cart_item['woo_excel_calculated_price']);
             // قیمت محاسبه شده برای متراژ وارد شده است، quantity همیشه 1
-            return wc_price($calculated_price);
+            return woo_excel_mng_format_price($calculated_price);
         }
 
         return $subtotal;
@@ -1487,7 +1487,7 @@ class Woo_Excel_Mng_Frontend
 
         wp_send_json_success(array(
             'price' => $calculated_price,
-            'formatted_price' => wc_price($calculated_price),
+            'formatted_price' => woo_excel_mng_format_price($calculated_price),
             'weight' => $total_weight,
             'formatted_weight' => wc_format_weight($total_weight)
         ));
@@ -1571,11 +1571,11 @@ class Woo_Excel_Mng_Frontend
 
         wp_send_json_success(array(
             'item_subtotal' => $item_subtotal,
-            'formatted_item_subtotal' => wc_price($item_subtotal),
+            'formatted_item_subtotal' => woo_excel_mng_format_price($item_subtotal),
             'cart_total' => $cart->get_subtotal(),
-            'formatted_cart_total' => wc_price($cart->get_subtotal()),
+            'formatted_cart_total' => woo_excel_mng_format_price($cart->get_subtotal()),
             'cart_total_with_shipping' => $cart->get_total(''),
-            'formatted_cart_total_with_shipping' => wc_price($cart->get_total(''))
+            'formatted_cart_total_with_shipping' => woo_excel_mng_format_price($cart->get_total(''))
         ));
     }
 

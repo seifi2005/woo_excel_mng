@@ -10,6 +10,8 @@ if (!defined('ABSPATH')) {
 $origin_city = get_option('woo_excel_mng_origin_city', 'تهران');
 $premium_threshold = get_option('woo_excel_mng_premium_threshold', 65000000);
 $shipping_percentage = get_option('woo_excel_mng_shipping_percentage', 2);
+$premium_threshold_display = woo_excel_mng_format_number($premium_threshold, 2, '.', '');
+$shipping_percentage_display = woo_excel_mng_format_number($shipping_percentage, 2, '.', '');
 ?>
 
 <div class="woo-excel-mng-settings">
@@ -51,7 +53,7 @@ $shipping_percentage = get_option('woo_excel_mng_shipping_percentage', 2);
                 <input type="number" 
                        name="woo_excel_mng_premium_threshold" 
                        id="woo_excel_mng_premium_threshold" 
-                       value="<?php echo esc_attr($premium_threshold); ?>" 
+                       value="<?php echo esc_attr($premium_threshold_display); ?>" 
                        class="regular-text"
                        min="0"
                        step="1000000"
@@ -68,7 +70,7 @@ $shipping_percentage = get_option('woo_excel_mng_shipping_percentage', 2);
                 <input type="number" 
                        name="woo_excel_mng_shipping_percentage" 
                        id="woo_excel_mng_shipping_percentage" 
-                       value="<?php echo esc_attr($shipping_percentage); ?>" 
+                       value="<?php echo esc_attr($shipping_percentage_display); ?>" 
                        class="regular-text"
                        min="0.1"
                        max="10"
