@@ -161,6 +161,34 @@ class Woo_Excel_Mng_Frontend
     }
 
     /**
+     * نرمال‌سازی ورودی اعشاری (پشتیبانی از ارقام فارسی/عربی)
+     */
+    private function normalize_decimal_input($value)
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $value = (string) $value;
+        if ($value === '') {
+            return '';
+        }
+
+        $value = str_replace(
+            array('۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹', '٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'),
+            array('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'),
+            $value
+        );
+
+        // حذف جداکننده هزارگان و فاصله‌ها
+        $value = str_replace(array('٬', ' '), '', $value);
+        // نرمال‌سازی جداکننده اعشار
+        $value = str_replace(array('٫', ','), '.', $value);
+
+        return $value;
+    }
+
+    /**
      * افزودن flag فرمول به داده‌های variation برای JS
      */
     public function add_variation_formula_flag($variation_data, $product, $variation)
@@ -194,13 +222,19 @@ class Woo_Excel_Mng_Frontend
         }
 
         $meterage = null;
+        $meterage_raw = null;
 
         if (isset($_REQUEST[self::CART_ITEM_METERAGE_KEY])) {
-            $meterage = floatval(str_replace(',', '.', (string) $_REQUEST[self::CART_ITEM_METERAGE_KEY]));
+            $meterage_raw = $_REQUEST[self::CART_ITEM_METERAGE_KEY];
         } elseif (isset($_REQUEST['meterage'])) {
-            $meterage = floatval(str_replace(',', '.', (string) $_REQUEST['meterage']));
+            $meterage_raw = $_REQUEST['meterage'];
         } elseif (isset($_REQUEST['quantity'])) {
-            $meterage = floatval(str_replace(',', '.', (string) $_REQUEST['quantity']));
+            $meterage_raw = $_REQUEST['quantity'];
+        }
+
+        if ($meterage_raw !== null) {
+            $meterage_raw = $this->normalize_decimal_input($meterage_raw);
+            $meterage = floatval($meterage_raw);
         }
 
         if ($meterage !== null && $meterage >= 0.1) {
@@ -259,7 +293,7 @@ class Woo_Excel_Mng_Frontend
 
         $meterage_formatted = number_format($meterage, 2, '.', '');
 
-        $html  = '<div class="woo-excel-meterage-qty">88888888888888888888888';
+        $html  = '<div class="woo-excel-meterage-qty">';
         $html .= '<label class="screen-reader-text" for="woo-excel-meterage-' . esc_attr($cart_item_key) . '">' . esc_html__('متراژ (متر)', 'woo-excel-mng') . '</label>';
         $html .= '<input type="number" class="input-text qty text woo-excel-meterage-input" ';
         $html .= 'name="' . esc_attr(self::CART_ITEM_METERAGE_KEY) . '[' . esc_attr($cart_item_key) . ']" ';
@@ -291,7 +325,8 @@ class Woo_Excel_Mng_Frontend
 
         foreach ($_POST[self::CART_ITEM_METERAGE_KEY] as $cart_item_key => $meterage_raw) {
             $cart_item_key = sanitize_text_field($cart_item_key);
-            $meterage = floatval(str_replace(',', '.', (string) $meterage_raw));
+            $meterage_raw = $this->normalize_decimal_input($meterage_raw);
+            $meterage = floatval($meterage_raw);
 
             if ($meterage < 0.1) {
                 continue;
@@ -1333,7 +1368,8 @@ class Woo_Excel_Mng_Frontend
         check_ajax_referer('woo_excel_mng_frontend_nonce', 'nonce');
 
         $variation_id = isset($_POST['variation_id']) ? intval($_POST['variation_id']) : 0;
-        $meterage = isset($_POST['meterage']) ? floatval($_POST['meterage']) : 0;
+        $meterage_raw = isset($_POST['meterage']) ? $this->normalize_decimal_input($_POST['meterage']) : '';
+        $meterage = floatval($meterage_raw);
 
         if ($variation_id <= 0 || $meterage < 0.1) {
             wp_send_json_error(__('داده‌های نامعتبر.', 'woo-excel-mng'));
@@ -1398,12 +1434,18 @@ class Woo_Excel_Mng_Frontend
         $cart_item_key = isset($_POST['cart_item_key']) ? sanitize_text_field($_POST['cart_item_key']) : '';
         // دریافت meterage (پشتیبانی از پارامتر قدیمی quantity)
         $meterage = 0;
+        $meterage_raw = null;
         if (isset($_POST[self::CART_ITEM_METERAGE_KEY])) {
-            $meterage = floatval(str_replace(',', '.', (string) $_POST[self::CART_ITEM_METERAGE_KEY]));
+            $meterage_raw = $_POST[self::CART_ITEM_METERAGE_KEY];
         } elseif (isset($_POST['meterage'])) {
-            $meterage = floatval(str_replace(',', '.', (string) $_POST['meterage']));
+            $meterage_raw = $_POST['meterage'];
         } elseif (isset($_POST['quantity'])) {
-            $meterage = floatval(str_replace(',', '.', (string) $_POST['quantity']));
+            $meterage_raw = $_POST['quantity'];
+        }
+
+        if ($meterage_raw !== null) {
+            $meterage_raw = $this->normalize_decimal_input($meterage_raw);
+            $meterage = floatval($meterage_raw);
         }
 
         if (empty($cart_item_key) || $meterage < 0.1) {
