@@ -4,7 +4,7 @@
  * Plugin Name: مدیریت محصولات متغیر ووکامرس
  * Plugin URI: https://example.com
  * Description: مدیریت انبوه محصولات متغیر ووکامرس از طریق Excel، مدیریت حمل‌ونقل پیشرفته و فرمول‌های قیمت‌گذاری پویا
- * Version: 1.0.6
+ * Version: 1.0.7
  * Author: Your Name
  * Author URI: https://example.com
  * Text Domain: woo-excel-mng
@@ -33,7 +33,7 @@ if (!in_array('woocommerce/woocommerce.php', apply_filters('active_plugins', get
 }
 
 // تعریف ثابت‌های افزونه
-define('WOO_EXCEL_MNG_VERSION', '1.0.6');
+define('WOO_EXCEL_MNG_VERSION', '1.0.7');
 define('WOO_EXCEL_MNG_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('WOO_EXCEL_MNG_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('WOO_EXCEL_MNG_PLUGIN_BASENAME', plugin_basename(__FILE__));
@@ -198,6 +198,18 @@ class Woo_Excel_Mng
 
         if (!get_option('woo_excel_mng_origin_city')) {
             update_option('woo_excel_mng_origin_city', 'تهران');
+        }
+
+        if (get_option('woo_excel_mng_peykan_max_length') === false) {
+            update_option('woo_excel_mng_peykan_max_length', 4);
+        }
+
+        if (get_option('woo_excel_mng_mazda_max_length') === false) {
+            update_option('woo_excel_mng_mazda_max_length', 5);
+        }
+
+        if (get_option('woo_excel_mng_nissan_max_length') === false) {
+            update_option('woo_excel_mng_nissan_max_length', 6);
         }
         
         // Flush rewrite rules

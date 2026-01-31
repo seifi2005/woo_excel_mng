@@ -404,6 +404,21 @@ class Woo_Excel_Mng_Admin {
             $shipping_percentage = floatval($_POST['woo_excel_mng_shipping_percentage']);
             update_option('woo_excel_mng_shipping_percentage', $shipping_percentage);
         }
+
+        if (isset($_POST['woo_excel_mng_peykan_max_length'])) {
+            $peykan_max_length = floatval(str_replace(',', '.', (string) $_POST['woo_excel_mng_peykan_max_length']));
+            update_option('woo_excel_mng_peykan_max_length', $peykan_max_length);
+        }
+
+        if (isset($_POST['woo_excel_mng_mazda_max_length'])) {
+            $mazda_max_length = floatval(str_replace(',', '.', (string) $_POST['woo_excel_mng_mazda_max_length']));
+            update_option('woo_excel_mng_mazda_max_length', $mazda_max_length);
+        }
+
+        if (isset($_POST['woo_excel_mng_nissan_max_length'])) {
+            $nissan_max_length = floatval(str_replace(',', '.', (string) $_POST['woo_excel_mng_nissan_max_length']));
+            update_option('woo_excel_mng_nissan_max_length', $nissan_max_length);
+        }
         
         add_action('admin_notices', function() {
             echo '<div class="notice notice-success"><p>' . __('تنظیمات با موفقیت ذخیره شد.', 'woo-excel-mng') . '</p></div>';

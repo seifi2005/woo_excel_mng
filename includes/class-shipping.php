@@ -122,7 +122,7 @@ class Woo_Excel_Mng_Shipping {
     /**
      * محاسبه هزینه حمل‌ونقل
      */
-    public static function calculate_shipping_cost($origin_city, $destination_city, $total_weight) {
+    public static function calculate_shipping_cost($origin_city, $destination_city, $total_weight, $max_length = 0) {
         global $wpdb;
         $table_name = $wpdb->prefix . 'woo_excel_shipping_routes';
         
@@ -140,8 +140,8 @@ class Woo_Excel_Mng_Shipping {
             return null;
         }
         
-        // تعیین وسیله نقلیه بر اساس وزن
-        $vehicle = self::select_vehicle($total_weight);
+        // تعیین وسیله نقلیه بر اساس وزن و طول
+        $vehicle = self::select_vehicle_by_weight_and_length($total_weight, $max_length);
         
         $cost = 0;
         switch ($vehicle) {
@@ -173,6 +173,66 @@ class Woo_Excel_Mng_Shipping {
         } else {
             return 'nissan';
         }
+    }
+
+    /**
+     * دریافت محدودیت طول برای هر وسیله
+     */
+    public static function get_length_limits() {
+        return array(
+            'peykan' => floatval(get_option('woo_excel_mng_peykan_max_length', 4)),
+            'mazda' => floatval(get_option('woo_excel_mng_mazda_max_length', 5)),
+            'nissan' => floatval(get_option('woo_excel_mng_nissan_max_length', 6)),
+        );
+    }
+
+    /**
+     * انتخاب وسیله نقلیه بر اساس طول
+     */
+    public static function select_vehicle_by_length($length) {
+        $length = floatval($length);
+        if ($length <= 0) {
+            return null;
+        }
+
+        $limits = self::get_length_limits();
+        $peykan_max = max(0, floatval($limits['peykan']));
+        $mazda_max = max(0, floatval($limits['mazda']));
+        $nissan_max = max(0, floatval($limits['nissan']));
+
+        if ($peykan_max > 0 && $length <= $peykan_max) {
+            return 'peykan';
+        }
+
+        if ($mazda_max > 0 && $length <= $mazda_max) {
+            return 'mazda';
+        }
+
+        if ($nissan_max > 0 && $length <= $nissan_max) {
+            return 'nissan';
+        }
+
+        return 'nissan';
+    }
+
+    /**
+     * انتخاب وسیله نقلیه بر اساس وزن و طول (اولویت با بزرگ‌تر)
+     */
+    public static function select_vehicle_by_weight_and_length($weight, $length) {
+        $by_weight = self::select_vehicle($weight);
+        $by_length = self::select_vehicle_by_length($length);
+
+        if (!$by_length) {
+            return $by_weight;
+        }
+
+        $priority = array(
+            'peykan' => 1,
+            'mazda' => 2,
+            'nissan' => 3,
+        );
+
+        return ($priority[$by_length] >= $priority[$by_weight]) ? $by_length : $by_weight;
     }
     
     /**

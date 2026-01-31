@@ -10,6 +10,12 @@ if (!defined('ABSPATH')) {
 $origin_city = get_option('woo_excel_mng_origin_city', 'تهران');
 $premium_threshold = get_option('woo_excel_mng_premium_threshold', 65000000);
 $shipping_percentage = get_option('woo_excel_mng_shipping_percentage', 2);
+$peykan_max_length = get_option('woo_excel_mng_peykan_max_length', 4);
+$mazda_max_length = get_option('woo_excel_mng_mazda_max_length', 5);
+$nissan_max_length = get_option('woo_excel_mng_nissan_max_length', 6);
+$peykan_max_length_display = woo_excel_mng_format_number($peykan_max_length, 2, '.', '');
+$mazda_max_length_display = woo_excel_mng_format_number($mazda_max_length, 2, '.', '');
+$nissan_max_length_display = woo_excel_mng_format_number($nissan_max_length, 2, '.', '');
 $premium_threshold_display = woo_excel_mng_format_number($premium_threshold, 2, '.', '');
 $shipping_percentage_display = woo_excel_mng_format_number($shipping_percentage, 2, '.', '');
 ?>
@@ -79,6 +85,55 @@ $shipping_percentage_display = woo_excel_mng_format_number($shipping_percentage,
                 <p class="description">
                     <?php _e('درصدی از مبلغ فاکتور که برای حمل رایگان در نظر گرفته می‌شود. پیش‌فرض: 2%', 'woo-excel-mng'); ?>
                 </p>
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <h3><?php _e('حداکثر طول بار (متر)', 'woo-excel-mng'); ?></h3>
+
+            <div class="form-group">
+                <label for="woo_excel_mng_peykan_max_length">
+                    <?php _e('پیکان (حداکثر طول)', 'woo-excel-mng'); ?>
+                </label>
+                <input type="number"
+                       name="woo_excel_mng_peykan_max_length"
+                       id="woo_excel_mng_peykan_max_length"
+                       value="<?php echo esc_attr($peykan_max_length_display); ?>"
+                       class="regular-text"
+                       min="0"
+                       step="0.1"
+                       required>
+                <p class="description"><?php _e('پیش‌فرض: 4 متر', 'woo-excel-mng'); ?></p>
+            </div>
+
+            <div class="form-group">
+                <label for="woo_excel_mng_mazda_max_length">
+                    <?php _e('مزدا (حداکثر طول)', 'woo-excel-mng'); ?>
+                </label>
+                <input type="number"
+                       name="woo_excel_mng_mazda_max_length"
+                       id="woo_excel_mng_mazda_max_length"
+                       value="<?php echo esc_attr($mazda_max_length_display); ?>"
+                       class="regular-text"
+                       min="0"
+                       step="0.1"
+                       required>
+                <p class="description"><?php _e('پیش‌فرض: 5 متر', 'woo-excel-mng'); ?></p>
+            </div>
+
+            <div class="form-group">
+                <label for="woo_excel_mng_nissan_max_length">
+                    <?php _e('نیسان (حداکثر طول)', 'woo-excel-mng'); ?>
+                </label>
+                <input type="number"
+                       name="woo_excel_mng_nissan_max_length"
+                       id="woo_excel_mng_nissan_max_length"
+                       value="<?php echo esc_attr($nissan_max_length_display); ?>"
+                       class="regular-text"
+                       min="0"
+                       step="0.1"
+                       required>
+                <p class="description"><?php _e('پیش‌فرض: 6 متر', 'woo-excel-mng'); ?></p>
             </div>
         </div>
         

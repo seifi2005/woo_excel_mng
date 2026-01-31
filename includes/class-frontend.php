@@ -248,6 +248,64 @@ class Woo_Excel_Mng_Frontend
     }
 
     /**
+     * استخراج عدد از مقدار ویژگی (طول)
+     */
+    private function parse_numeric_value($value)
+    {
+        if (is_array($value)) {
+            $value = reset($value);
+        }
+
+        $value = $this->normalize_decimal_input($value);
+        if (preg_match('/-?\d+(?:\.\d+)?/', (string) $value, $matches)) {
+            return floatval($matches[0]);
+        }
+
+        return 0;
+    }
+
+    /**
+     * دریافت طول از ویژگی محصول
+     */
+    private function get_product_length_value($product)
+    {
+        if (!$product || !method_exists($product, 'get_attributes')) {
+            return 0;
+        }
+
+        $attributes = $product->get_attributes();
+        $length_slug = sanitize_title('طول');
+
+        if (isset($attributes[$length_slug])) {
+            return $this->parse_numeric_value($attributes[$length_slug]);
+        }
+
+        if (isset($attributes['pa_' . $length_slug])) {
+            return $this->parse_numeric_value($attributes['pa_' . $length_slug]);
+        }
+
+        return 0;
+    }
+
+    /**
+     * بیشترین طول در سبد خرید
+     */
+    private function get_cart_max_length($cart_items)
+    {
+        $max_length = 0;
+
+        foreach ($cart_items as $cart_item) {
+            $product = isset($cart_item['data']) ? $cart_item['data'] : null;
+            $length = $this->get_product_length_value($product);
+            if ($length > $max_length) {
+                $max_length = $length;
+            }
+        }
+
+        return $max_length;
+    }
+
+    /**
      * محاسبه کلید سبد خرید بدون در نظر گرفتن متراژ
      */
     public function filter_cart_id($cart_id, $product_id, $variation_id, $variation, $cart_item_data)
@@ -805,10 +863,12 @@ class Woo_Excel_Mng_Frontend
 
         if ($destination_city && $total_weight > 0) {
             // محاسبه هزینه حمل از جدول
+            $max_length = $this->get_cart_max_length(WC()->cart->get_cart());
             $shipping_result = Woo_Excel_Mng_Shipping::calculate_shipping_cost(
                 $origin_city,
                 $destination_city,
-                $total_weight
+                $total_weight,
+                $max_length
             );
 
             if ($shipping_result) {
@@ -1427,10 +1487,12 @@ class Woo_Excel_Mng_Frontend
         }
 
         // محاسبه هزینه حمل از جدول
+        $max_length = $this->get_cart_max_length(WC()->cart->get_cart());
         $shipping_result = Woo_Excel_Mng_Shipping::calculate_shipping_cost(
             $origin_city,
             $destination_city,
-            $total_weight
+            $total_weight,
+            $max_length
         );
 
         if (!$shipping_result) {
@@ -1544,7 +1606,8 @@ class Woo_Excel_Mng_Frontend
         }
 
         // محاسبه هزینه حمل‌ونقل
-        $shipping_cost = Woo_Excel_Mng_Shipping::calculate_shipping_cost($origin_city, $destination_city, $total_weight);
+        $max_length = $this->get_cart_max_length(WC()->cart->get_cart());
+        $shipping_cost = Woo_Excel_Mng_Shipping::calculate_shipping_cost($origin_city, $destination_city, $total_weight, $max_length);
 
         if (!$shipping_cost || $shipping_cost['cost'] <= 0) {
             return $rates;
