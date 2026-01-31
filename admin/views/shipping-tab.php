@@ -9,8 +9,6 @@ if (!defined('ABSPATH')) {
 
 global $wpdb;
 $table_name = $wpdb->prefix . 'woo_excel_shipping_routes';
-$free_shipping_threshold = get_option('woo_excel_mng_free_shipping_threshold', 20000000);
-$free_shipping_threshold_display = woo_excel_mng_format_number($free_shipping_threshold, 2, '.', '');
 
 // دریافت تمام مسیرها
 $routes = $wpdb->get_results("SELECT * FROM $table_name ORDER BY origin_city, destination_city", ARRAY_A);
@@ -20,35 +18,6 @@ $routes = $wpdb->get_results("SELECT * FROM $table_name ORDER BY origin_city, de
     <div class="section-header">
         <h2><?php _e('مدیریت حمل‌ونقل', 'woo-excel-mng'); ?></h2>
         <p class="description"><?php _e('مدیریت نرخ‌های حمل‌ونقل بر اساس شهر مبدا و مقصد', 'woo-excel-mng'); ?></p>
-    </div>
-    
-    <!-- تنظیمات حمل رایگان -->
-    <div class="settings-box">
-        <h3><?php _e('تنظیمات حمل رایگان', 'woo-excel-mng'); ?></h3>
-        <form method="post" action="" class="settings-form">
-            <?php wp_nonce_field('woo_excel_mng_save_settings', 'woo_excel_mng_nonce'); ?>
-            <input type="hidden" name="action" value="save_shipping_settings">
-            
-            <div class="form-group">
-                <label for="free_shipping_threshold">
-                    <?php _e('آستانه حمل رایگان (تومان)', 'woo-excel-mng'); ?>
-                </label>
-                <input type="number" 
-                       name="free_shipping_threshold" 
-                       id="free_shipping_threshold" 
-                       value="<?php echo esc_attr($free_shipping_threshold_display); ?>" 
-                       class="regular-text"
-                       min="0"
-                       step="1000">
-                <p class="description"><?php _e('اگر مبلغ کل سبد خرید از این مقدار بیشتر شود، هزینه حمل رایگان می‌شود.', 'woo-excel-mng'); ?></p>
-            </div>
-            
-            <div class="form-actions">
-                <button type="submit" class="button button-primary">
-                    <?php _e('ذخیره تنظیمات', 'woo-excel-mng'); ?>
-                </button>
-            </div>
-        </form>
     </div>
     
     <!-- آپلود فایل Excel -->
