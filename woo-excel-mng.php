@@ -4,7 +4,7 @@
  * Plugin Name: مدیریت محصولات متغیر ووکامرس
  * Plugin URI: https://example.com
  * Description: مدیریت انبوه محصولات متغیر ووکامرس از طریق Excel، مدیریت حمل‌ونقل پیشرفته و فرمول‌های قیمت‌گذاری پویا
- * Version: 1.0.0
+ * Version: 1.0.7
  * Author: Your Name
  * Author URI: https://example.com
  * Text Domain: woo-excel-mng
@@ -33,7 +33,7 @@ if (!in_array('woocommerce/woocommerce.php', apply_filters('active_plugins', get
 }
 
 // تعریف ثابت‌های افزونه
-define('WOO_EXCEL_MNG_VERSION', '1.0.0');
+define('WOO_EXCEL_MNG_VERSION', '1.0.7');
 define('WOO_EXCEL_MNG_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('WOO_EXCEL_MNG_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('WOO_EXCEL_MNG_PLUGIN_BASENAME', plugin_basename(__FILE__));
@@ -199,6 +199,18 @@ class Woo_Excel_Mng
         if (!get_option('woo_excel_mng_origin_city')) {
             update_option('woo_excel_mng_origin_city', 'تهران');
         }
+
+        if (get_option('woo_excel_mng_peykan_max_length') === false) {
+            update_option('woo_excel_mng_peykan_max_length', 4);
+        }
+
+        if (get_option('woo_excel_mng_mazda_max_length') === false) {
+            update_option('woo_excel_mng_mazda_max_length', 5);
+        }
+
+        if (get_option('woo_excel_mng_nissan_max_length') === false) {
+            update_option('woo_excel_mng_nissan_max_length', 6);
+        }
         
         // Flush rewrite rules
         flush_rewrite_rules();
@@ -211,6 +223,52 @@ class Woo_Excel_Mng
     {
         // پاکسازی در صورت نیاز
         delete_option('woo_excel_mng_test_option');
+    }
+}
+
+/**
+ * فرمت اعداد با حذف اعشار صفر
+ */
+if (!function_exists('woo_excel_mng_format_number')) {
+    function woo_excel_mng_format_number($value, $decimals = 2, $decimal_separator = '.', $thousands_separator = '')
+    {
+        if ($value === null || $value === '') {
+            return $value;
+        }
+
+        $number = floatval($value);
+        $rounded = round($number, $decimals);
+        $formatted = number_format($rounded, $decimals, $decimal_separator, $thousands_separator);
+
+        // حذف صفرهای پایانی اعشار
+        if ($decimals > 0) {
+            $formatted = rtrim($formatted, '0');
+            $formatted = rtrim($formatted, $decimal_separator);
+        }
+
+        return $formatted;
+    }
+}
+
+/**
+ * فرمت قیمت با حذف .00
+ */
+if (!function_exists('woo_excel_mng_format_price')) {
+    function woo_excel_mng_format_price($price, $args = array())
+    {
+        if (!function_exists('wc_price')) {
+            return woo_excel_mng_format_number($price, 2, '.', '');
+        }
+
+        $decimals = function_exists('wc_get_price_decimals') ? wc_get_price_decimals() : 2;
+        $rounded = round((float) $price, $decimals);
+        $is_integer = abs($rounded - round($rounded)) < (1 / pow(10, $decimals + 1));
+
+        if ($is_integer) {
+            $args['decimals'] = 0;
+        }
+
+        return wc_price($rounded, $args);
     }
 }
 

@@ -10,6 +10,7 @@ if (!defined('ABSPATH')) {
 global $wpdb;
 $table_name = $wpdb->prefix . 'woo_excel_shipping_routes';
 $free_shipping_threshold = get_option('woo_excel_mng_free_shipping_threshold', 20000000);
+$free_shipping_threshold_display = woo_excel_mng_format_number($free_shipping_threshold, 2, '.', '');
 
 // دریافت تمام مسیرها
 $routes = $wpdb->get_results("SELECT * FROM $table_name ORDER BY origin_city, destination_city", ARRAY_A);
@@ -35,7 +36,7 @@ $routes = $wpdb->get_results("SELECT * FROM $table_name ORDER BY origin_city, de
                 <input type="number" 
                        name="free_shipping_threshold" 
                        id="free_shipping_threshold" 
-                       value="<?php echo esc_attr($free_shipping_threshold); ?>" 
+                       value="<?php echo esc_attr($free_shipping_threshold_display); ?>" 
                        class="regular-text"
                        min="0"
                        step="1000">
@@ -114,7 +115,7 @@ $routes = $wpdb->get_results("SELECT * FROM $table_name ORDER BY origin_city, de
                                     <input type="number" 
                                            class="route-price" 
                                            data-field="peykan_price" 
-                                           value="<?php echo esc_attr($route['peykan_price']); ?>" 
+                                           value="<?php echo esc_attr(woo_excel_mng_format_number($route['peykan_price'], 2, '.', '')); ?>" 
                                            min="0" 
                                            step="1000">
                                 </td>
@@ -122,7 +123,7 @@ $routes = $wpdb->get_results("SELECT * FROM $table_name ORDER BY origin_city, de
                                     <input type="number" 
                                            class="route-price" 
                                            data-field="mazda_price" 
-                                           value="<?php echo esc_attr($route['mazda_price']); ?>" 
+                                           value="<?php echo esc_attr(woo_excel_mng_format_number($route['mazda_price'], 2, '.', '')); ?>" 
                                            min="0" 
                                            step="1000">
                                 </td>
@@ -130,7 +131,7 @@ $routes = $wpdb->get_results("SELECT * FROM $table_name ORDER BY origin_city, de
                                     <input type="number" 
                                            class="route-price" 
                                            data-field="nissan_price" 
-                                           value="<?php echo esc_attr($route['nissan_price']); ?>" 
+                                           value="<?php echo esc_attr(woo_excel_mng_format_number($route['nissan_price'], 2, '.', '')); ?>" 
                                            min="0" 
                                            step="1000">
                                 </td>

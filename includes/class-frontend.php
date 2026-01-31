@@ -12,6 +12,9 @@ class Woo_Excel_Mng_Frontend
 {
 
     const CART_ITEM_METERAGE_KEY = 'woo_excel_meterage';
+    const METERAGE_MIN_DEFAULT = 0.5;
+    const METERAGE_STEP_DEFAULT = 0.5;
+    private static $skip_cart_id_filter = false;
 
     /**
      * سازنده
@@ -24,6 +27,11 @@ class Woo_Excel_Mng_Frontend
 
         // تغییر label quantity در صفحه محصول
         add_filter('woocommerce_quantity_input_args', array($this, 'change_quantity_label'), 10, 2);
+        add_filter('woocommerce_quantity_input', array($this, 'render_custom_quantity_input'), 10, 3);
+
+        // جلوگیری از ایجاد آیتم تکراری بر اساس متراژ
+        add_filter('woocommerce_cart_id', array($this, 'filter_cart_id'), 10, 5);
+        add_action('woocommerce_add_to_cart', array($this, 'merge_meterage_on_add_to_cart'), 10, 6);
 
         // تغییر quantity input در سبد خرید برای محصولات با فرمول (فقط Cart کلاسیک)
         add_filter('woocommerce_quantity_input_args', array($this, 'change_cart_quantity_input'), 10, 2);
@@ -94,14 +102,17 @@ class Woo_Excel_Mng_Frontend
         // تغییر label quantity در صفحه محصول برای محصولات با فرمول
         add_action('woocommerce_before_add_to_cart_quantity', array($this, 'add_quantity_label'), 10);
 
-        // نمایش بلاک اطلاعات حمل‌ونقل (وزن، هزینه، نوع وسیله) برای کل سبد خرید
-        add_action('woocommerce_after_cart_table', array($this, 'display_shipping_info_box'), 10);
+        // نمایش جمع وزن قبل از جمع کل سبد خرید
+        add_action('woocommerce_cart_totals_before_order_total', array($this, 'render_total_weight_row'), 10);
 
         // اضافه کردن script برای تنظیم step و min در cart
         add_action('wp_footer', array($this, 'add_cart_quantity_script'), 99);
 
         // بارگذاری اسکریپت‌ها و استایل‌ها
         add_action('wp_enqueue_scripts', array($this, 'enqueue_frontend_assets'));
+
+        // غیرفعال کردن کد تخفیف در سبد خرید
+        add_filter('woocommerce_coupons_enabled', array($this, 'disable_cart_coupons'), 10, 1);
     }
 
     /**
@@ -112,6 +123,17 @@ class Woo_Excel_Mng_Frontend
         // فقط در صفحات محصول و سبد خرید
         if (!is_product() && !is_cart() && !is_checkout()) {
             return;
+        }
+
+        $has_formula_product = false;
+        if (function_exists('is_product') && is_product() && function_exists('wc_get_product')) {
+            $product = wc_get_product(get_the_ID());
+            if ($product instanceof WC_Product_Variation) {
+                $parent_id = $product->get_parent_id();
+                $has_formula_product = (bool) Woo_Excel_Mng_Formulas::get_product_formula($parent_id);
+            } elseif ($product instanceof WC_Product) {
+                $has_formula_product = (bool) Woo_Excel_Mng_Formulas::get_product_formula($product->get_id());
+            }
         }
 
         wp_enqueue_style(
@@ -132,6 +154,9 @@ class Woo_Excel_Mng_Frontend
         wp_localize_script('woo-excel-mng-frontend', 'wooExcelMngFrontend', array(
             'ajax_url' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('woo_excel_mng_frontend_nonce'),
+            'has_formula_product' => $has_formula_product,
+            'meterage_min' => $this->get_meterage_min(),
+            'meterage_step' => $this->get_meterage_step(),
             'strings' => array(
                 'enter_meterage' => __('لطفاً متراژ را وارد کنید.', 'woo-excel-mng'),
                 'calculating' => __('در حال محاسبه...', 'woo-excel-mng'),
@@ -157,7 +182,8 @@ class Woo_Excel_Mng_Frontend
             return (bool) Woo_Excel_Mng_Formulas::get_product_formula($product->get_id());
         }
 
-        return false;
+        // برای سایر نوع‌ها، اگر فرمول تعریف شده باشد true است
+        return (bool) Woo_Excel_Mng_Formulas::get_product_formula($product->get_id());
     }
 
     /**
@@ -186,6 +212,174 @@ class Woo_Excel_Mng_Frontend
         $value = str_replace(array('٫', ','), '.', $value);
 
         return $value;
+    }
+
+    /**
+     * حداقل متراژ مجاز
+     */
+    private function get_meterage_min()
+    {
+        $min = apply_filters('woo_excel_mng_meterage_min', self::METERAGE_MIN_DEFAULT);
+        return max(0, floatval($min));
+    }
+
+    /**
+     * گام افزایش متراژ
+     */
+    private function get_meterage_step()
+    {
+        $step = apply_filters('woo_excel_mng_meterage_step', self::METERAGE_STEP_DEFAULT);
+        return max(0, floatval($step));
+    }
+
+    /**
+     * نرمال‌سازی متراژ بر اساس گام
+     */
+    private function normalize_meterage_value($value)
+    {
+        $meterage = floatval($value);
+        $step = $this->get_meterage_step();
+
+        if ($step > 0) {
+            $meterage = round($meterage / $step) * $step;
+        }
+
+        return round($meterage, 2);
+    }
+
+    /**
+     * استخراج عدد از مقدار ویژگی (طول)
+     */
+    private function parse_numeric_value($value)
+    {
+        if (is_array($value)) {
+            $value = reset($value);
+        }
+
+        $value = $this->normalize_decimal_input($value);
+        if (preg_match('/-?\d+(?:\.\d+)?/', (string) $value, $matches)) {
+            return floatval($matches[0]);
+        }
+
+        return 0;
+    }
+
+    /**
+     * دریافت طول از ویژگی محصول
+     */
+    private function get_product_length_value($product)
+    {
+        if (!$product || !method_exists($product, 'get_attributes')) {
+            return 0;
+        }
+
+        $attributes = $product->get_attributes();
+        $length_slug = sanitize_title('طول');
+
+        if (isset($attributes[$length_slug])) {
+            return $this->parse_numeric_value($attributes[$length_slug]);
+        }
+
+        if (isset($attributes['pa_' . $length_slug])) {
+            return $this->parse_numeric_value($attributes['pa_' . $length_slug]);
+        }
+
+        return 0;
+    }
+
+    /**
+     * بیشترین طول در سبد خرید
+     */
+    private function get_cart_max_length($cart_items)
+    {
+        $max_length = 0;
+
+        foreach ($cart_items as $cart_item) {
+            $product = isset($cart_item['data']) ? $cart_item['data'] : null;
+            $length = $this->get_product_length_value($product);
+            if ($length > $max_length) {
+                $max_length = $length;
+            }
+        }
+
+        return $max_length;
+    }
+
+    /**
+     * محاسبه کلید سبد خرید بدون در نظر گرفتن متراژ
+     */
+    public function filter_cart_id($cart_id, $product_id, $variation_id, $variation, $cart_item_data)
+    {
+        if (self::$skip_cart_id_filter) {
+            return $cart_id;
+        }
+
+        if (!isset($cart_item_data[self::CART_ITEM_METERAGE_KEY])) {
+            return $cart_id;
+        }
+
+        $data = $cart_item_data;
+        unset($data[self::CART_ITEM_METERAGE_KEY]);
+        unset($data['woo_excel_unique']);
+
+        if (function_exists('WC') && WC()->cart) {
+            try {
+                self::$skip_cart_id_filter = true;
+                $new_id = WC()->cart->generate_cart_id($product_id, $variation_id, $variation, $data);
+                return $new_id;
+            } finally {
+                self::$skip_cart_id_filter = false;
+            }
+        }
+
+        return $cart_id;
+    }
+
+    /**
+     * ادغام متراژ هنگام افزودن به سبد خرید
+     */
+    public function merge_meterage_on_add_to_cart($cart_item_key, $product_id, $quantity, $variation_id, $variation, $cart_item_data)
+    {
+        if (!$variation_id) {
+            return;
+        }
+
+        $variation_product = wc_get_product($variation_id);
+        if (!$variation_product || !$this->is_formula_product($variation_product)) {
+            return;
+        }
+
+        $incoming_meterage = 0;
+        if (isset($cart_item_data[self::CART_ITEM_METERAGE_KEY])) {
+            $incoming_meterage = $this->normalize_meterage_value($cart_item_data[self::CART_ITEM_METERAGE_KEY]);
+        } elseif (isset($_REQUEST[self::CART_ITEM_METERAGE_KEY])) {
+            $incoming_meterage = $this->normalize_meterage_value($this->normalize_decimal_input($_REQUEST[self::CART_ITEM_METERAGE_KEY]));
+        } elseif (isset($_REQUEST['meterage'])) {
+            $incoming_meterage = $this->normalize_meterage_value($this->normalize_decimal_input($_REQUEST['meterage']));
+        } elseif (isset($_REQUEST['quantity'])) {
+            $incoming_meterage = $this->normalize_meterage_value($this->normalize_decimal_input($_REQUEST['quantity']));
+        }
+
+        if ($incoming_meterage <= 0 || $incoming_meterage < $this->get_meterage_min()) {
+            return;
+        }
+
+        $cart = WC()->cart;
+        $cart_item = $cart ? $cart->get_cart_item($cart_item_key) : null;
+        if (!$cart_item) {
+            return;
+        }
+
+        $existing_meterage = isset($cart_item[self::CART_ITEM_METERAGE_KEY])
+            ? floatval($cart_item[self::CART_ITEM_METERAGE_KEY])
+            : 0;
+
+        $new_meterage = $existing_meterage > 0
+            ? $existing_meterage + $incoming_meterage
+            : $incoming_meterage;
+
+        $cart->cart_contents[$cart_item_key][self::CART_ITEM_METERAGE_KEY] = $new_meterage;
+        $cart->cart_contents[$cart_item_key]['quantity'] = 1;
     }
 
     /**
@@ -234,13 +428,11 @@ class Woo_Excel_Mng_Frontend
 
         if ($meterage_raw !== null) {
             $meterage_raw = $this->normalize_decimal_input($meterage_raw);
-            $meterage = floatval($meterage_raw);
+            $meterage = $this->normalize_meterage_value($meterage_raw);
         }
 
-        if ($meterage !== null && $meterage >= 0.1) {
+        if ($meterage !== null && $meterage >= $this->get_meterage_min()) {
             $cart_item_data[self::CART_ITEM_METERAGE_KEY] = $meterage;
-            // کلید یکتا برای جلوگیری از merge شدن آیتم‌ها
-            $cart_item_data['woo_excel_unique'] = md5($variation_id . '|' . $meterage . '|' . wp_rand());
         }
 
         return $cart_item_data;
@@ -286,19 +478,19 @@ class Woo_Excel_Mng_Frontend
             return $product_quantity;
         }
 
-        $meterage = isset($cart_item[self::CART_ITEM_METERAGE_KEY]) ? floatval($cart_item[self::CART_ITEM_METERAGE_KEY]) : 1;
-        if ($meterage < 0.1) {
-            $meterage = 1;
+        $meterage = isset($cart_item[self::CART_ITEM_METERAGE_KEY]) ? floatval($cart_item[self::CART_ITEM_METERAGE_KEY]) : $this->get_meterage_min();
+        if ($meterage < $this->get_meterage_min()) {
+            $meterage = $this->get_meterage_min();
         }
 
-        $meterage_formatted = number_format($meterage, 2, '.', '');
+        $meterage_formatted = woo_excel_mng_format_number($meterage, 2, '.', '');
 
         $html  = '<div class="woo-excel-meterage-qty">';
         $html .= '<label class="screen-reader-text" for="woo-excel-meterage-' . esc_attr($cart_item_key) . '">' . esc_html__('متراژ (متر)', 'woo-excel-mng') . '</label>';
         $html .= '<input type="number" class="input-text qty text woo-excel-meterage-input" ';
         $html .= 'name="' . esc_attr(self::CART_ITEM_METERAGE_KEY) . '[' . esc_attr($cart_item_key) . ']" ';
         $html .= 'id="woo-excel-meterage-' . esc_attr($cart_item_key) . '" ';
-        $html .= 'value="' . esc_attr($meterage_formatted) . '" step="0.01" min="0.1" inputmode="decimal" />';
+        $html .= 'value="' . esc_attr($meterage_formatted) . '" step="' . esc_attr($this->get_meterage_step()) . '" min="' . esc_attr($this->get_meterage_min()) . '" inputmode="decimal" />';
         $html .= '<input type="hidden" name="cart[' . esc_attr($cart_item_key) . '][qty]" value="1" />';
         $html .= '</div>';
 
@@ -326,9 +518,9 @@ class Woo_Excel_Mng_Frontend
         foreach ($_POST[self::CART_ITEM_METERAGE_KEY] as $cart_item_key => $meterage_raw) {
             $cart_item_key = sanitize_text_field($cart_item_key);
             $meterage_raw = $this->normalize_decimal_input($meterage_raw);
-            $meterage = floatval($meterage_raw);
+            $meterage = $this->normalize_meterage_value($meterage_raw);
 
-            if ($meterage < 0.1) {
+            if ($meterage < $this->get_meterage_min()) {
                 continue;
             }
 
@@ -385,20 +577,77 @@ class Woo_Excel_Mng_Frontend
      */
     public function change_quantity_label($args, $product)
     {
-        if ($product && $product->is_type('variable')) {
-            $formula = Woo_Excel_Mng_Formulas::get_product_formula($product->get_id());
-            if ($formula) {
-                $args['input_name'] = 'quantity';
-                $args['min_value'] = 0.1;
-                $args['step'] = 0.01;
-                // اضافه کردن label سفارشی
-                if (!isset($args['classes'])) {
-                    $args['classes'] = array();
-                }
-                $args['classes'][] = 'woo-excel-meterage-quantity';
+        $target_product_id = 0;
+
+        if ($product instanceof WC_Product_Variation) {
+            $target_product_id = $product->get_parent_id();
+        } elseif ($product instanceof WC_Product) {
+            $target_product_id = $product->get_id();
+        } elseif (function_exists('is_product') && is_product()) {
+            $target_product_id = get_the_ID();
+        }
+
+        $has_formula = false;
+        if ($target_product_id) {
+            $has_formula = (bool) Woo_Excel_Mng_Formulas::get_product_formula($target_product_id);
+        }
+
+        if ($has_formula) {
+            $args['input_name'] = 'quantity';
+            $args['min_value'] = $this->get_meterage_min();
+            $args['step'] = $this->get_meterage_step();
+            $args['inputmode'] = 'decimal';
+            // اضافه کردن label سفارشی
+            if (!isset($args['classes'])) {
+                $args['classes'] = array();
             }
+            $args['classes'][] = 'woo-excel-meterage-quantity';
         }
         return $args;
+    }
+
+    /**
+     * رندر ورودی سفارشی متراژ برای محصولات دارای فرمول
+     */
+    public function render_custom_quantity_input($html, $product = null, $args = array())
+    {
+        if (!function_exists('is_product') || !is_product()) {
+            return $html;
+        }
+
+        if (!is_array($args)) {
+            $args = array();
+        }
+
+        $product_id = 0;
+        if ($product instanceof WC_Product_Variation) {
+            $product_id = $product->get_parent_id();
+        } elseif ($product instanceof WC_Product) {
+            $product_id = $product->get_id();
+        } else {
+            $product_id = get_the_ID();
+        }
+
+        if (!$product_id || !Woo_Excel_Mng_Formulas::get_product_formula($product_id)) {
+            return $html;
+        }
+
+        $input_id = isset($args['input_id']) ? $args['input_id'] : 'woo_excel_meterage';
+        $input_value = isset($args['input_value']) ? $args['input_value'] : 1;
+        $input_value = $input_value ? $input_value : 1;
+        $min_value = $this->get_meterage_min();
+        $step_value = $this->get_meterage_step();
+
+        $label = esc_html__('متراژ (متر)', 'woo-excel-mng');
+        $html  = '<div class="quantity">';
+        $html .= '<label class="screen-reader-text" for="' . esc_attr($input_id) . '">' . $label . '</label>';
+        $html .= '<input type="text" id="' . esc_attr($input_id) . '" class="input-text qty text woo-excel-meterage-quantity" ';
+        $html .= 'name="woo_excel_meterage" value="' . esc_attr($input_value) . '" ';
+        $html .= 'inputmode="decimal" autocomplete="off" data-min="' . esc_attr($min_value) . '" data-step="' . esc_attr($step_value) . '" />';
+        $html .= '<input type="hidden" name="quantity" value="1" />';
+        $html .= '</div>';
+
+        return $html;
     }
 
     /**
@@ -424,8 +673,8 @@ class Woo_Excel_Mng_Frontend
                         $formula = Woo_Excel_Mng_Formulas::get_product_formula($parent_id);
                         if ($formula) {
                             // تنظیم step و min برای quantity در cart
-                            $args['min_value'] = 0.1;
-                            $args['step'] = 0.01;
+                            $args['min_value'] = $this->get_meterage_min();
+                            $args['step'] = $this->get_meterage_step();
                             break;
                         }
                     }
@@ -435,8 +684,8 @@ class Woo_Excel_Mng_Frontend
             $parent_id = $product->get_parent_id();
             $formula = Woo_Excel_Mng_Formulas::get_product_formula($parent_id);
             if ($formula) {
-                $args['min_value'] = 0.1;
-                $args['step'] = 0.01;
+                $args['min_value'] = $this->get_meterage_min();
+                $args['step'] = $this->get_meterage_step();
             }
         }
 
@@ -453,13 +702,50 @@ class Woo_Excel_Mng_Frontend
             $parent_id = $product->get_parent_id();
             $formula = Woo_Excel_Mng_Formulas::get_product_formula($parent_id);
             if ($formula) {
-                $meterage = isset($cart_item[self::CART_ITEM_METERAGE_KEY]) ? floatval($cart_item[self::CART_ITEM_METERAGE_KEY]) : 1;
-                $formatted_meterage = number_format($meterage, 2, '.', '');
+                $meterage = isset($cart_item[self::CART_ITEM_METERAGE_KEY]) ? floatval($cart_item[self::CART_ITEM_METERAGE_KEY]) : $this->get_meterage_min();
+                $formatted_meterage = woo_excel_mng_format_number($meterage, 2, '.', '');
                 $product_name .= '<br><small class="woo-excel-meterage-display">' . sprintf(__('متراژ: %s متر', 'woo-excel-mng'), $formatted_meterage) . '</small>';
             }
         }
 
         return $product_name;
+    }
+
+    /**
+     * نمایش جمع وزن زیر فاکتور
+     */
+    public function render_total_weight_row()
+    {
+        if (!WC()->cart || WC()->cart->is_empty()) {
+            return;
+        }
+
+        $total_weight = 0;
+        foreach (WC()->cart->get_cart() as $cart_item) {
+            if (isset($cart_item['woo_excel_calculated_weight'])) {
+                $total_weight += floatval($cart_item['woo_excel_calculated_weight']);
+                continue;
+            }
+
+            $product = isset($cart_item['data']) ? $cart_item['data'] : null;
+            if (!$product) {
+                continue;
+            }
+
+            $meterage = isset($cart_item[self::CART_ITEM_METERAGE_KEY])
+                ? floatval($cart_item[self::CART_ITEM_METERAGE_KEY])
+                : (isset($cart_item['quantity']) ? floatval($cart_item['quantity']) : 1);
+
+            $product_weight = floatval($product->get_weight());
+            if ($product_weight > 0) {
+                $total_weight += $product_weight * $meterage;
+            }
+        }
+
+        echo '<tr class="woo-excel-total-weight">';
+        echo '<th>' . esc_html__('جمع وزن', 'woo-excel-mng') . '</th>';
+        echo '<td data-title="' . esc_attr__('جمع وزن', 'woo-excel-mng') . '">' . wc_format_weight($total_weight) . '</td>';
+        echo '</tr>';
     }
 
     /**
@@ -577,10 +863,12 @@ class Woo_Excel_Mng_Frontend
 
         if ($destination_city && $total_weight > 0) {
             // محاسبه هزینه حمل از جدول
+            $max_length = $this->get_cart_max_length(WC()->cart->get_cart());
             $shipping_result = Woo_Excel_Mng_Shipping::calculate_shipping_cost(
                 $origin_city,
                 $destination_city,
-                $total_weight
+                $total_weight,
+                $max_length
             );
 
             if ($shipping_result) {
@@ -654,7 +942,7 @@ class Woo_Excel_Mng_Frontend
                         <?php foreach ($cart_items_details as $item): ?>
                             <tr>
                                 <td><?php echo esc_html($item['name']); ?></td>
-                                <td class="meterage-value"><?php echo number_format($item['meterage'], 2); ?> <?php _e('متر', 'woo-excel-mng'); ?></td>
+                                <td class="meterage-value"><?php echo esc_html(woo_excel_mng_format_number($item['meterage'], 2, '.', '')); ?> <?php _e('متر', 'woo-excel-mng'); ?></td>
                                 <td><?php echo esc_html($item['length'] ? $item['length'] : '-'); ?></td>
                                 <td><?php echo esc_html($item['color'] ? $item['color'] : '-'); ?></td>
                                 <td><?php echo esc_html($item['thickness'] ? $item['thickness'] : '-'); ?></td>
@@ -679,7 +967,7 @@ class Woo_Excel_Mng_Frontend
                             <span class="dashicons dashicons-yes-alt"></span>
                             <strong><?php _e('حمل رایگان!', 'woo-excel-mng'); ?></strong>
                             <?php if ($is_premium_mode): ?>
-                                <p><?php printf(__('هزینه حمل (%s) کمتر از %s%% مبلغ فاکتور (%s) است.', 'woo-excel-mng'), wc_price($base_shipping_cost), number_format($shipping_percentage * 100, 1), wc_price($shipping_percentage_amount)); ?></p>
+                                <p><?php printf(__('هزینه حمل (%s) کمتر از %s%% مبلغ فاکتور (%s) است.', 'woo-excel-mng'), woo_excel_mng_format_price($base_shipping_cost), number_format($shipping_percentage * 100, 1), woo_excel_mng_format_price($shipping_percentage_amount)); ?></p>
                             <?php else: ?>
                                 <p><?php _e('حمل شما رایگان است.', 'woo-excel-mng'); ?></p>
                             <?php endif; ?>
@@ -693,7 +981,7 @@ class Woo_Excel_Mng_Frontend
                                 </p>
                                 <p>
                                     <strong><?php _e('هزینه حمل:', 'woo-excel-mng'); ?></strong>
-                                    <span class="shipping-cost"><?php echo wc_price($shipping_cost); ?></span>
+                                    <span class="shipping-cost"><?php echo woo_excel_mng_format_price($shipping_cost); ?></span>
                                 </p>
 
                                 <?php if ($is_premium_mode && $target_amount > 0): ?>
@@ -706,7 +994,7 @@ class Woo_Excel_Mng_Frontend
                                             <?php
                                             printf(
                                                 __('اگر خرید خود را به %s برسانید، حمل رایگان می‌شود!', 'woo-excel-mng'),
-                                                '<strong>' . wc_price($target_amount) . '</strong>'
+                                                '<strong>' . woo_excel_mng_format_price($target_amount) . '</strong>'
                                             );
                                             ?>
                                         </p>
@@ -714,9 +1002,9 @@ class Woo_Excel_Mng_Frontend
                                             <?php
                                             printf(
                                                 __('هزینه حمل (%s) = %s%% × مبلغ فاکتور → مبلغ هدف = %s', 'woo-excel-mng'),
-                                                wc_price($base_shipping_cost),
+                                                woo_excel_mng_format_price($base_shipping_cost),
                                                 number_format($shipping_percentage * 100, 1),
-                                                wc_price($target_amount)
+                                                woo_excel_mng_format_price($target_amount)
                                             );
                                             ?>
                                         </p>
@@ -725,7 +1013,7 @@ class Woo_Excel_Mng_Frontend
                                             $remaining_for_free = $target_amount - $cart_total;
                                             printf(
                                                 __('%s دیگر تا حمل رایگان', 'woo-excel-mng'),
-                                                '<strong>' . wc_price($remaining_for_free) . '</strong>'
+                                                '<strong>' . woo_excel_mng_format_price($remaining_for_free) . '</strong>'
                                             );
                                             ?>
                                         </p>
@@ -742,7 +1030,7 @@ class Woo_Excel_Mng_Frontend
                                             <p>
                                                 <?php printf(
                                                     __('%s دیگر تا حمل رایگان', 'woo-excel-mng'),
-                                                    wc_price($remaining)
+                                                    woo_excel_mng_format_price($remaining)
                                                 ); ?>
                                             </p>
                                             <div class="woo-excel-progress-bar">
@@ -751,8 +1039,8 @@ class Woo_Excel_Mng_Frontend
                                             <p class="progress-text">
                                                 <?php printf(
                                                     __('مبلغ فعلی: %s / حد آستانه: %s', 'woo-excel-mng'),
-                                                    wc_price($cart_total),
-                                                    wc_price($free_shipping_threshold)
+                                                    woo_excel_mng_format_price($cart_total),
+                                                    woo_excel_mng_format_price($free_shipping_threshold)
                                                 ); ?>
                                             </p>
                                         </div>
@@ -948,8 +1236,8 @@ class Woo_Excel_Mng_Frontend
                         if ($row.find('.woo-excel-meterage-display').length > 0) {
                             // تنظیم step و min برای جلوگیری از گرد شدن
                             $input.attr({
-                                'step': '0.01',
-                                'min': '0.1',
+                                'step': '<?php echo esc_js($this->get_meterage_step()); ?>',
+                                'min': '<?php echo esc_js($this->get_meterage_min()); ?>',
                                 'type': 'number'
                             });
                         }
@@ -975,7 +1263,18 @@ class Woo_Excel_Mng_Frontend
     {
         if (isset($cart_item['woo_excel_calculated_price'])) {
             $calculated_price = floatval($cart_item['woo_excel_calculated_price']);
-            return wc_price($calculated_price);
+            $meterage = isset($cart_item[self::CART_ITEM_METERAGE_KEY]) ? floatval($cart_item[self::CART_ITEM_METERAGE_KEY]) : 0;
+
+            if ($meterage > 0) {
+                $unit_price = $calculated_price / $meterage;
+                return sprintf(
+                    '%s <small class="woo-excel-unit-price">/ %s</small>',
+                    woo_excel_mng_format_price($unit_price),
+                    esc_html__('متر', 'woo-excel-mng')
+                );
+            }
+
+            return woo_excel_mng_format_price($calculated_price);
         }
 
         return $price;
@@ -989,7 +1288,7 @@ class Woo_Excel_Mng_Frontend
         if (isset($cart_item['woo_excel_calculated_price'])) {
             $calculated_price = floatval($cart_item['woo_excel_calculated_price']);
             // قیمت محاسبه شده برای متراژ وارد شده است، quantity همیشه 1
-            return wc_price($calculated_price);
+            return woo_excel_mng_format_price($calculated_price);
         }
 
         return $subtotal;
@@ -1033,9 +1332,9 @@ class Woo_Excel_Mng_Frontend
                 }
 
                 // متراژ از cart item meta (quantity همیشه 1)
-                $meterage = isset($cart_item[self::CART_ITEM_METERAGE_KEY]) ? floatval($cart_item[self::CART_ITEM_METERAGE_KEY]) : 1;
-                if ($meterage < 0.1) {
-                    $meterage = 1;
+                $meterage = isset($cart_item[self::CART_ITEM_METERAGE_KEY]) ? floatval($cart_item[self::CART_ITEM_METERAGE_KEY]) : $this->get_meterage_min();
+                if ($meterage < $this->get_meterage_min()) {
+                    $meterage = $this->get_meterage_min();
                 }
 
                 // اجباری: qty باید integer باشد
@@ -1188,10 +1487,12 @@ class Woo_Excel_Mng_Frontend
         }
 
         // محاسبه هزینه حمل از جدول
+        $max_length = $this->get_cart_max_length(WC()->cart->get_cart());
         $shipping_result = Woo_Excel_Mng_Shipping::calculate_shipping_cost(
             $origin_city,
             $destination_city,
-            $total_weight
+            $total_weight,
+            $max_length
         );
 
         if (!$shipping_result) {
@@ -1305,7 +1606,8 @@ class Woo_Excel_Mng_Frontend
         }
 
         // محاسبه هزینه حمل‌ونقل
-        $shipping_cost = Woo_Excel_Mng_Shipping::calculate_shipping_cost($origin_city, $destination_city, $total_weight);
+        $max_length = $this->get_cart_max_length(WC()->cart->get_cart());
+        $shipping_cost = Woo_Excel_Mng_Shipping::calculate_shipping_cost($origin_city, $destination_city, $total_weight, $max_length);
 
         if (!$shipping_cost || $shipping_cost['cost'] <= 0) {
             return $rates;
@@ -1369,9 +1671,9 @@ class Woo_Excel_Mng_Frontend
 
         $variation_id = isset($_POST['variation_id']) ? intval($_POST['variation_id']) : 0;
         $meterage_raw = isset($_POST['meterage']) ? $this->normalize_decimal_input($_POST['meterage']) : '';
-        $meterage = floatval($meterage_raw);
+        $meterage = $this->normalize_meterage_value($meterage_raw);
 
-        if ($variation_id <= 0 || $meterage < 0.1) {
+        if ($variation_id <= 0 || $meterage < $this->get_meterage_min()) {
             wp_send_json_error(__('داده‌های نامعتبر.', 'woo-excel-mng'));
         }
 
@@ -1418,7 +1720,7 @@ class Woo_Excel_Mng_Frontend
 
         wp_send_json_success(array(
             'price' => $calculated_price,
-            'formatted_price' => wc_price($calculated_price),
+            'formatted_price' => woo_excel_mng_format_price($calculated_price),
             'weight' => $total_weight,
             'formatted_weight' => wc_format_weight($total_weight)
         ));
@@ -1445,10 +1747,10 @@ class Woo_Excel_Mng_Frontend
 
         if ($meterage_raw !== null) {
             $meterage_raw = $this->normalize_decimal_input($meterage_raw);
-            $meterage = floatval($meterage_raw);
+            $meterage = $this->normalize_meterage_value($meterage_raw);
         }
 
-        if (empty($cart_item_key) || $meterage < 0.1) {
+        if (empty($cart_item_key) || $meterage < $this->get_meterage_min()) {
             wp_send_json_error(__('داده‌های نامعتبر.', 'woo-excel-mng'));
         }
 
@@ -1502,11 +1804,11 @@ class Woo_Excel_Mng_Frontend
 
         wp_send_json_success(array(
             'item_subtotal' => $item_subtotal,
-            'formatted_item_subtotal' => wc_price($item_subtotal),
+            'formatted_item_subtotal' => woo_excel_mng_format_price($item_subtotal),
             'cart_total' => $cart->get_subtotal(),
-            'formatted_cart_total' => wc_price($cart->get_subtotal()),
+            'formatted_cart_total' => woo_excel_mng_format_price($cart->get_subtotal()),
             'cart_total_with_shipping' => $cart->get_total(''),
-            'formatted_cart_total_with_shipping' => wc_price($cart->get_total(''))
+            'formatted_cart_total_with_shipping' => woo_excel_mng_format_price($cart->get_total(''))
         ));
     }
 
@@ -1603,5 +1905,17 @@ class Woo_Excel_Mng_Frontend
             $city = sanitize_text_field($_POST['woo_excel_destination_city']);
             update_post_meta($order_id, '_woo_excel_destination_city', $city);
         }
+    }
+
+    /**
+     * غیرفعال کردن کد تخفیف در سبد خرید
+     */
+    public function disable_cart_coupons($enabled)
+    {
+        if (function_exists('is_cart') && is_cart()) {
+            return false;
+        }
+
+        return $enabled;
     }
 }

@@ -35,6 +35,13 @@
     font-size: 16px;
 }
 
+/* ===== افزایش عرض ورودی متراژ/تعداد ===== */
+.woo-excel-meterage-quantity,
+.woo-excel-meterage-input {
+    width: 160px;
+    max-width: 260px;
+}
+
 .woo-excel-meterage-input:focus {
     border-color: #2271b1;
     outline: none;
@@ -112,6 +119,12 @@
     color: #646970;
     font-size: 13px;
     margin-top: 5px;
+}
+
+.woo-excel-unit-price {
+    color: #646970;
+    font-size: 12px;
+    font-weight: 400;
 }
 
 /* ===== بلاک اطلاعات حمل‌ونقل در سبد خرید ===== */
@@ -426,7 +439,8 @@ table.cart .woo-excel-meterage-quantity + label::before {
 
 /* ===== ریسپانسیو ===== */
 @media (max-width: 768px) {
-    .woo-excel-meterage-input {
+    .woo-excel-meterage-input,
+    .woo-excel-meterage-quantity {
         max-width: 100%;
     }
     
