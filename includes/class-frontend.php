@@ -248,24 +248,26 @@ class Woo_Excel_Mng_Frontend
     }
 
     /**
-     * جمع متراژ در سبد خرید
+     * بیشترین متراژ در سبد خرید
      */
-    private function get_cart_total_meterage($cart_items)
+    private function get_cart_max_meterage($cart_items)
     {
-        $total_meterage = 0;
+        $max_meterage = 0;
 
         foreach ($cart_items as $cart_item) {
+            $meterage = 0;
             if (isset($cart_item[self::CART_ITEM_METERAGE_KEY])) {
-                $total_meterage += floatval($cart_item[self::CART_ITEM_METERAGE_KEY]);
-                continue;
+                $meterage = floatval($cart_item[self::CART_ITEM_METERAGE_KEY]);
+            } elseif (isset($cart_item['quantity'])) {
+                $meterage = floatval($cart_item['quantity']);
             }
 
-            if (isset($cart_item['quantity'])) {
-                $total_meterage += floatval($cart_item['quantity']);
+            if ($meterage > $max_meterage) {
+                $max_meterage = $meterage;
             }
         }
 
-        return $total_meterage;
+        return $max_meterage;
     }
 
     /**
@@ -815,7 +817,7 @@ class Woo_Excel_Mng_Frontend
             }
         }
 
-        $total_meterage = $this->get_cart_total_meterage(WC()->cart->get_cart());
+        $max_meterage = $this->get_cart_max_meterage(WC()->cart->get_cart());
 
         // محاسبه هزینه حمل و نوع وسیله (اگر شهر انتخاب شده باشد)
         $shipping_cost = 0;
@@ -834,7 +836,7 @@ class Woo_Excel_Mng_Frontend
                 $origin_city,
                 $destination_city,
                 $total_weight,
-                $total_meterage
+                $max_meterage
             );
 
             if ($shipping_result) {
@@ -856,8 +858,8 @@ class Woo_Excel_Mng_Frontend
                     $from_vehicle = isset($vehicle_names[$vehicle_by_weight]) ? $vehicle_names[$vehicle_by_weight] : ucfirst($vehicle_by_weight);
                     $to_vehicle = isset($vehicle_names[$vehicle_by_meterage]) ? $vehicle_names[$vehicle_by_meterage] : ucfirst($vehicle_by_meterage);
                     $vehicle_upgrade_notice = sprintf(
-                        __('به دلیل متراژ سفارش (%s متر)، نوع خودرو از %s به %s تغییر کرد.', 'woo-excel-mng'),
-                        woo_excel_mng_format_number($total_meterage, 2, '.', ''),
+                        __('به دلیل بیشترین متراژ آیتم‌ها (%s متر)، نوع خودرو از %s به %s تغییر کرد.', 'woo-excel-mng'),
+                        woo_excel_mng_format_number($max_meterage, 2, '.', ''),
                         $from_vehicle,
                         $to_vehicle
                     );
@@ -1472,12 +1474,12 @@ class Woo_Excel_Mng_Frontend
         }
 
         // محاسبه هزینه حمل از جدول
-        $total_meterage = $this->get_cart_total_meterage(WC()->cart->get_cart());
+        $max_meterage = $this->get_cart_max_meterage(WC()->cart->get_cart());
         $shipping_result = Woo_Excel_Mng_Shipping::calculate_shipping_cost(
             $origin_city,
             $destination_city,
             $total_weight,
-            $total_meterage
+            $max_meterage
         );
 
         if (!$shipping_result) {
@@ -1591,8 +1593,8 @@ class Woo_Excel_Mng_Frontend
         }
 
         // محاسبه هزینه حمل‌ونقل
-        $total_meterage = $this->get_cart_total_meterage(WC()->cart->get_cart());
-        $shipping_cost = Woo_Excel_Mng_Shipping::calculate_shipping_cost($origin_city, $destination_city, $total_weight, $total_meterage);
+        $max_meterage = $this->get_cart_max_meterage(WC()->cart->get_cart());
+        $shipping_cost = Woo_Excel_Mng_Shipping::calculate_shipping_cost($origin_city, $destination_city, $total_weight, $max_meterage);
 
         if (!$shipping_cost || $shipping_cost['cost'] <= 0) {
             return $rates;
