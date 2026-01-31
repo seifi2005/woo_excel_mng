@@ -549,6 +549,7 @@ class Woo_Excel_Mng_Admin {
             'products' => __('محصولات', 'woo-excel-mng'),
             'shipping' => __('حمل‌ونقل', 'woo-excel-mng'),
             'formulas' => __('فرمول‌ها', 'woo-excel-mng'),
+            'settings' => __('تنظیمات', 'woo-excel-mng'),
         );
         
         include WOO_EXCEL_MNG_PLUGIN_DIR . 'admin/views/main-page.php';
@@ -579,6 +580,7 @@ class Woo_Excel_Mng_Admin {
             'products' => __('محصولات', 'woo-excel-mng'),
             'shipping' => __('حمل‌ونقل', 'woo-excel-mng'),
             'formulas' => __('فرمول‌ها', 'woo-excel-mng'),
+            'settings' => __('تنظیمات', 'woo-excel-mng'),
         );
         include WOO_EXCEL_MNG_PLUGIN_DIR . 'admin/views/main-page.php';
     }
@@ -593,6 +595,7 @@ class Woo_Excel_Mng_Admin {
             'products' => __('محصولات', 'woo-excel-mng'),
             'shipping' => __('حمل‌ونقل', 'woo-excel-mng'),
             'formulas' => __('فرمول‌ها', 'woo-excel-mng'),
+            'settings' => __('تنظیمات', 'woo-excel-mng'),
         );
         include WOO_EXCEL_MNG_PLUGIN_DIR . 'admin/views/main-page.php';
     }
@@ -607,6 +610,7 @@ class Woo_Excel_Mng_Admin {
             'products' => __('محصولات', 'woo-excel-mng'),
             'shipping' => __('حمل‌ونقل', 'woo-excel-mng'),
             'formulas' => __('فرمول‌ها', 'woo-excel-mng'),
+            'settings' => __('تنظیمات', 'woo-excel-mng'),
         );
         include WOO_EXCEL_MNG_PLUGIN_DIR . 'admin/views/main-page.php';
     }
