@@ -331,10 +331,35 @@ class Woo_Excel_Mng_Formulas
         $thickness_slug = isset($name_to_slug['ضخامت']) ? $name_to_slug['ضخامت'] : sanitize_title('ضخامت');
         $color_slug = isset($name_to_slug['رنگ']) ? $name_to_slug['رنگ'] : sanitize_title('رنگ');
 
+        $length_value = isset($attributes[$length_slug]) ? $attributes[$length_slug] : '';
+        $thickness_value = isset($attributes[$thickness_slug]) ? $attributes[$thickness_slug] : '';
+        $color_value = isset($attributes[$color_slug]) ? $attributes[$color_slug] : '';
+
+        if ($length_value && taxonomy_exists($length_slug)) {
+            $term = get_term_by('slug', $length_value, $length_slug);
+            if ($term && !is_wp_error($term)) {
+                $length_value = $term->name;
+            }
+        }
+
+        if ($thickness_value && taxonomy_exists($thickness_slug)) {
+            $term = get_term_by('slug', $thickness_value, $thickness_slug);
+            if ($term && !is_wp_error($term)) {
+                $thickness_value = $term->name;
+            }
+        }
+
+        if ($color_value && taxonomy_exists($color_slug)) {
+            $term = get_term_by('slug', $color_value, $color_slug);
+            if ($term && !is_wp_error($term)) {
+                $color_value = $term->name;
+            }
+        }
+
         $variables = array(
-            'length' => isset($attributes[$length_slug]) ? floatval($attributes[$length_slug]) : 0,
-            'thickness' => isset($attributes[$thickness_slug]) ? floatval($attributes[$thickness_slug]) : 0,
-            'color' => isset($attributes[$color_slug]) ? $attributes[$color_slug] : '',
+            'length' => $length_value !== '' ? floatval($length_value) : 0,
+            'thickness' => $thickness_value !== '' ? floatval($thickness_value) : 0,
+            'color' => $color_value !== '' ? $color_value : '',
             'meter' => floatval($meterage),
             'base_price' => floatval($variation->get_regular_price()),
             'weight' => floatval($variation->get_weight())

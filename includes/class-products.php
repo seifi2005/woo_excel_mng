@@ -100,11 +100,18 @@ class Woo_Excel_Mng_Products {
      * نرمال‌سازی نام محصول برای جستجو
      */
     private static function normalize_product_name($product_name) {
-        $product_name = wp_unslash($product_name);
-        $product_name = trim((string) $product_name);
-        $product_name = str_replace(array('ي', 'ك', 'ة'), array('ی', 'ک', 'ه'), $product_name);
-        $product_name = preg_replace('/\s+/u', ' ', $product_name);
-        return $product_name;
+        return self::normalize_text($product_name);
+    }
+
+    /**
+     * نرمال‌سازی متن (نام محصول و برچسب ویژگی)
+     */
+    private static function normalize_text($text) {
+        $text = wp_unslash($text);
+        $text = trim((string) $text);
+        $text = str_replace(array('ي', 'ك', 'ة'), array('ی', 'ک', 'ه'), $text);
+        $text = preg_replace('/\s+/u', ' ', $text);
+        return $text;
     }
 
     /**
@@ -254,10 +261,10 @@ class Woo_Excel_Mng_Products {
             }
 
             $values = array_values($attributes[$key]);
-            $tax_name = wc_attribute_taxonomy_name($label);
+            $tax_name = self::get_attribute_taxonomy_name_by_label($label);
             $attribute = new WC_Product_Attribute();
 
-            if (taxonomy_exists($tax_name)) {
+            if ($tax_name && taxonomy_exists($tax_name)) {
                 $term_ids = array();
                 foreach ($values as $value) {
                     $value = trim((string) $value);
@@ -277,6 +284,10 @@ class Woo_Excel_Mng_Products {
                 $attribute->set_id($taxonomy_id);
                 $attribute->set_name($tax_name);
                 $attribute->set_options($term_ids);
+
+                if (!empty($term_ids)) {
+                    wp_set_object_terms($product_id, $term_ids, $tax_name);
+                }
             } else {
                 $attribute->set_id(0);
                 $attribute->set_name($label);
@@ -361,17 +372,17 @@ class Woo_Excel_Mng_Products {
         if (!empty($variation_data['length'])) {
             $length_value = strval(trim($variation_data['length']));
             $length_slug = $name_to_slug['طول'];
-            $variation_attributes[$length_slug] = $length_value;
+            $variation_attributes[$length_slug] = self::resolve_attribute_value($length_slug, $length_value, $product_id);
         }
         if (!empty($variation_data['color'])) {
             $color_value = strval(trim($variation_data['color']));
             $color_slug = $name_to_slug['رنگ'];
-            $variation_attributes[$color_slug] = $color_value;
+            $variation_attributes[$color_slug] = self::resolve_attribute_value($color_slug, $color_value, $product_id);
         }
         if (!empty($variation_data['thickness'])) {
             $thickness_value = strval(trim($variation_data['thickness']));
             $thickness_slug = $name_to_slug['ضخامت'];
-            $variation_attributes[$thickness_slug] = $thickness_value;
+            $variation_attributes[$thickness_slug] = self::resolve_attribute_value($thickness_slug, $thickness_value, $product_id);
         }
         
         // بررسی اینکه آیا ویژگی‌ها خالی نیستند
@@ -527,6 +538,60 @@ class Woo_Excel_Mng_Products {
         }
         
         return false;
+    }
+
+    /**
+     * دریافت نام taxonomy برای برچسب ویژگی
+     */
+    private static function get_attribute_taxonomy_name_by_label($label) {
+        $label = self::normalize_text($label);
+        if ($label === '') {
+            return '';
+        }
+
+        $taxonomies = wc_get_attribute_taxonomies();
+        $label_slug = sanitize_title($label);
+
+        if (!empty($taxonomies)) {
+            foreach ($taxonomies as $taxonomy) {
+                $taxonomy_label = self::normalize_text($taxonomy->attribute_label);
+                if ($taxonomy_label === $label || $taxonomy->attribute_name === $label_slug) {
+                    return wc_attribute_taxonomy_name($taxonomy->attribute_name);
+                }
+            }
+        }
+
+        $default_tax = wc_attribute_taxonomy_name($label);
+        return taxonomy_exists($default_tax) ? $default_tax : '';
+    }
+
+    /**
+     * تبدیل مقدار ویژگی برای Variation (در taxonomy با slug ذخیره شود)
+     */
+    private static function resolve_attribute_value($attribute_key, $value, $product_id) {
+        $value = trim((string) $value);
+        if ($value === '') {
+            return $value;
+        }
+
+        if (!taxonomy_exists($attribute_key)) {
+            return $value;
+        }
+
+        $term = term_exists($value, $attribute_key);
+        if (!$term) {
+            $term = wp_insert_term($value, $attribute_key);
+        }
+
+        if (!is_wp_error($term) && !empty($term['term_id'])) {
+            $term_obj = get_term($term['term_id'], $attribute_key);
+            if ($term_obj && !is_wp_error($term_obj)) {
+                wp_set_object_terms($product_id, (int) $term['term_id'], $attribute_key, true);
+                return $term_obj->slug;
+            }
+        }
+
+        return sanitize_title($value);
     }
     
     /**
