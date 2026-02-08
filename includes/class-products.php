@@ -152,6 +152,7 @@ class Woo_Excel_Mng_Products {
         $text = trim((string) $text);
         $text = str_replace(array('ي', 'ك', 'ة'), array('ی', 'ک', 'ه'), $text);
         $text = preg_replace('/\s+/u', ' ', $text);
+        $text = preg_replace('/\s*[*]+$/u', '', $text);
         return $text;
     }
 
@@ -159,7 +160,14 @@ class Woo_Excel_Mng_Products {
      * نرمال‌سازی مقدار ویژگی
      */
     private static function normalize_attribute_value($value) {
-        return self::normalize_text($value);
+        $value = self::normalize_text($value);
+        $value = str_replace(array('٫', ','), '.', $value);
+
+        if (preg_match('/^\d+\/\d+$/', $value)) {
+            $value = str_replace('/', '.', $value);
+        }
+
+        return $value;
     }
 
     /**
@@ -646,7 +654,7 @@ class Woo_Excel_Mng_Products {
      * تبدیل مقدار ویژگی برای Variation (در taxonomy با slug ذخیره شود)
      */
     private static function resolve_attribute_value($attribute_key, $value, $product_id) {
-        $value = trim((string) $value);
+        $value = self::normalize_attribute_value($value);
         if ($value === '') {
             return $value;
         }
