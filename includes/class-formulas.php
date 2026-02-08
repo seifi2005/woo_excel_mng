@@ -311,6 +311,10 @@ class Woo_Excel_Mng_Formulas
                 $attr_name = $attribute->get_name();
                 $name_to_slug[$attr_name] = $attr_key;
             } else {
+                $label = wc_attribute_label($attribute->get_name());
+                if ($label) {
+                    $name_to_slug[$label] = $attr_key;
+                }
                 $name_to_slug[$attr_key] = $attr_key;
             }
         }

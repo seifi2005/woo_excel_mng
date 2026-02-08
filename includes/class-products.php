@@ -102,6 +102,7 @@ class Woo_Excel_Mng_Products {
     private static function normalize_product_name($product_name) {
         $product_name = wp_unslash($product_name);
         $product_name = trim((string) $product_name);
+        $product_name = str_replace(array('ي', 'ك', 'ة'), array('ی', 'ک', 'ه'), $product_name);
         $product_name = preg_replace('/\s+/u', ' ', $product_name);
         return $product_name;
     }
@@ -240,35 +241,48 @@ class Woo_Excel_Mng_Products {
         }
         
         $product_attributes = array();
-        
-        // ویژگی طول
-        if (!empty($attributes['length'])) {
+
+        $attribute_labels = array(
+            'length' => 'طول',
+            'color' => 'رنگ',
+            'thickness' => 'ضخامت',
+        );
+
+        foreach ($attribute_labels as $key => $label) {
+            if (empty($attributes[$key])) {
+                continue;
+            }
+
+            $values = array_values($attributes[$key]);
+            $tax_name = wc_attribute_taxonomy_name($label);
             $attribute = new WC_Product_Attribute();
-            $attribute->set_id(0);
-            $attribute->set_name('طول');
-            $attribute->set_options(array_values($attributes['length']));
-            $attribute->set_visible(true);
-            $attribute->set_variation(true);
-            $product_attributes[] = $attribute;
-        }
-        
-        // ویژگی رنگ
-        if (!empty($attributes['color'])) {
-            $attribute = new WC_Product_Attribute();
-            $attribute->set_id(0);
-            $attribute->set_name('رنگ');
-            $attribute->set_options(array_values($attributes['color']));
-            $attribute->set_visible(true);
-            $attribute->set_variation(true);
-            $product_attributes[] = $attribute;
-        }
-        
-        // ویژگی ضخامت
-        if (!empty($attributes['thickness'])) {
-            $attribute = new WC_Product_Attribute();
-            $attribute->set_id(0);
-            $attribute->set_name('ضخامت');
-            $attribute->set_options(array_values($attributes['thickness']));
+
+            if (taxonomy_exists($tax_name)) {
+                $term_ids = array();
+                foreach ($values as $value) {
+                    $value = trim((string) $value);
+                    if ($value === '') {
+                        continue;
+                    }
+                    $term = term_exists($value, $tax_name);
+                    if (!$term) {
+                        $term = wp_insert_term($value, $tax_name);
+                    }
+                    if (!is_wp_error($term) && !empty($term['term_id'])) {
+                        $term_ids[] = (int) $term['term_id'];
+                    }
+                }
+
+                $taxonomy_id = wc_attribute_taxonomy_id_by_name($tax_name);
+                $attribute->set_id($taxonomy_id);
+                $attribute->set_name($tax_name);
+                $attribute->set_options($term_ids);
+            } else {
+                $attribute->set_id(0);
+                $attribute->set_name($label);
+                $attribute->set_options($values);
+            }
+
             $attribute->set_visible(true);
             $attribute->set_variation(true);
             $product_attributes[] = $attribute;
@@ -321,6 +335,10 @@ class Woo_Excel_Mng_Products {
                 $name_to_slug[$attr_name] = $attr_key;
             } else {
                 // برای taxonomy attributes
+                $label = wc_attribute_label($attribute->get_name());
+                if ($label) {
+                    $name_to_slug[$label] = $attr_key;
+                }
                 $name_to_slug[$attr_key] = $attr_key;
             }
         }
