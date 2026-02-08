@@ -600,21 +600,36 @@ class Woo_Excel_Mng_Products {
             
             $variation_attrs = $variation->get_attributes();
             
-            // مقایسه دقیق تمام ویژگی‌ها (تبدیل به string برای مقایسه)
+            // مقایسه دقیق تمام ویژگی‌ها (با پشتیبانی از taxonomy)
             $match = true;
             foreach ($attributes as $key => $value) {
-                $attr_value = isset($variation_attrs[$key]) ? strval(trim($variation_attrs[$key])) : '';
-                $search_value = strval(trim($value));
-                
-                if ($attr_value !== $search_value) {
+                $target_values = self::normalize_attribute_compare_values($key, $value);
+                if (empty($target_values)) {
+                    $match = false;
+                    break;
+                }
+
+                $variation_value = isset($variation_attrs[$key]) ? $variation_attrs[$key] : '';
+                $variation_values = self::normalize_attribute_compare_values($key, $variation_value);
+
+                if (empty($variation_values) || !array_intersect($target_values, $variation_values)) {
                     $match = false;
                     break;
                 }
             }
             
-            // بررسی تعداد ویژگی‌ها (باید یکسان باشد)
-            if ($match && count($variation_attrs) !== count($attributes)) {
-                $match = false;
+            // اگر variation ویژگی اضافه دارد و مقدارش خالی نیست، mismatch حساب شود
+            if ($match) {
+                foreach ($variation_attrs as $attr_key => $attr_value) {
+                    if (array_key_exists($attr_key, $attributes)) {
+                        continue;
+                    }
+                    $extra_values = self::normalize_attribute_compare_values($attr_key, $attr_value);
+                    if (!empty($extra_values)) {
+                        $match = false;
+                        break;
+                    }
+                }
             }
             
             if ($match) {
@@ -623,6 +638,39 @@ class Woo_Excel_Mng_Products {
         }
         
         return false;
+    }
+
+    /**
+     * مقادیر قابل مقایسه برای ویژگی‌ها (نام/اسلاگ ترم)
+     */
+    private static function normalize_attribute_compare_values($attribute_key, $value) {
+        $normalized = self::normalize_attribute_value($value);
+        if ($normalized === '') {
+            return array();
+        }
+
+        $values = array($normalized);
+
+        if (taxonomy_exists($attribute_key)) {
+            $slug = sanitize_title($normalized);
+            $term_by_slug = get_term_by('slug', $slug, $attribute_key);
+            if ($term_by_slug && !is_wp_error($term_by_slug)) {
+                $values[] = $term_by_slug->slug;
+                $values[] = $term_by_slug->name;
+            }
+
+            $term_by_name = get_term_by('name', $normalized, $attribute_key);
+            if ($term_by_name && !is_wp_error($term_by_name)) {
+                $values[] = $term_by_name->slug;
+                $values[] = $term_by_name->name;
+            }
+        }
+
+        $values = array_filter(array_unique($values), function($item) {
+            return $item !== '';
+        });
+
+        return array_values($values);
     }
 
     /**
