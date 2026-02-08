@@ -42,8 +42,20 @@ class Woo_Excel_Mng_Products {
                     continue;
                 }
                 
+                // نرمال‌سازی داده‌ها
+                foreach ($variations_data as $index => $variation_data) {
+                    $variations_data[$index] = self::normalize_variation_attributes($variation_data);
+                }
+
                 // جمع‌آوری تمام ویژگی‌ها
                 $attributes = self::collect_attributes($variations_data);
+
+                $required_attribute_keys = array();
+                foreach ($attributes as $key => $values) {
+                    if (!empty($values)) {
+                        $required_attribute_keys[] = $key;
+                    }
+                }
                 
                 // تنظیم ویژگی‌های محصول
                 self::set_product_attributes($product_id, $attributes);
@@ -57,6 +69,35 @@ class Woo_Excel_Mng_Products {
                 
                 // ایجاد یا به‌روزرسانی Variationها
                 foreach ($variations_data as $variation_data) {
+                    $missing = array();
+                    foreach ($required_attribute_keys as $key) {
+                        if (self::is_empty_value($variation_data[$key] ?? '')) {
+                            $missing[] = $key;
+                        }
+                    }
+
+                    if (!empty($missing)) {
+                        $missing_labels = array_map(function($key) {
+                            switch ($key) {
+                                case 'length':
+                                    return __('طول', 'woo-excel-mng');
+                                case 'color':
+                                    return __('رنگ', 'woo-excel-mng');
+                                case 'thickness':
+                                    return __('ضخامت', 'woo-excel-mng');
+                                default:
+                                    return $key;
+                            }
+                        }, $missing);
+
+                        $errors[] = sprintf(
+                            __('ردیف برای "%s" به‌دلیل خالی بودن ویژگی‌ها (%s) نادیده گرفته شد.', 'woo-excel-mng'),
+                            $product_name,
+                            implode(', ', $missing_labels)
+                        );
+                        continue;
+                    }
+
                     $result = self::create_or_update_variation($product_id, $variation_data, $attributes);
                     
                     if (is_wp_error($result)) {
@@ -112,6 +153,38 @@ class Woo_Excel_Mng_Products {
         $text = str_replace(array('ي', 'ك', 'ة'), array('ی', 'ک', 'ه'), $text);
         $text = preg_replace('/\s+/u', ' ', $text);
         return $text;
+    }
+
+    /**
+     * نرمال‌سازی مقدار ویژگی
+     */
+    private static function normalize_attribute_value($value) {
+        return self::normalize_text($value);
+    }
+
+    /**
+     * آیا مقدار خالی است؟
+     */
+    private static function is_empty_value($value) {
+        $value = trim((string) $value);
+        return $value === '';
+    }
+
+    /**
+     * نرمال‌سازی ویژگی‌های variation
+     */
+    private static function normalize_variation_attributes($variation_data) {
+        $variation_data['length'] = isset($variation_data['length'])
+            ? self::normalize_attribute_value($variation_data['length'])
+            : '';
+        $variation_data['color'] = isset($variation_data['color'])
+            ? self::normalize_attribute_value($variation_data['color'])
+            : '';
+        $variation_data['thickness'] = isset($variation_data['thickness'])
+            ? self::normalize_attribute_value($variation_data['thickness'])
+            : '';
+
+        return $variation_data;
     }
 
     /**
@@ -224,14 +297,18 @@ class Woo_Excel_Mng_Products {
         );
         
         foreach ($variations_data as $data) {
-            if (!empty($data['length'])) {
-                $attributes['length'][$data['length']] = $data['length'];
+            $length_value = self::normalize_attribute_value($data['length'] ?? '');
+            $color_value = self::normalize_attribute_value($data['color'] ?? '');
+            $thickness_value = self::normalize_attribute_value($data['thickness'] ?? '');
+
+            if (!self::is_empty_value($length_value)) {
+                $attributes['length'][$length_value] = $length_value;
             }
-            if (!empty($data['color'])) {
-                $attributes['color'][$data['color']] = $data['color'];
+            if (!self::is_empty_value($color_value)) {
+                $attributes['color'][$color_value] = $color_value;
             }
-            if (!empty($data['thickness'])) {
-                $attributes['thickness'][$data['thickness']] = $data['thickness'];
+            if (!self::is_empty_value($thickness_value)) {
+                $attributes['thickness'][$thickness_value] = $thickness_value;
             }
         }
         
