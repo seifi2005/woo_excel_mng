@@ -113,6 +113,10 @@ class Woo_Excel_Mng_Frontend
 
         // غیرفعال کردن کد تخفیف در سبد خرید
         add_filter('woocommerce_coupons_enabled', array($this, 'disable_cart_coupons'), 10, 1);
+
+        // نمایش باکس حمل‌ونقل در سبد خرید و تسویه حساب
+        add_action('woocommerce_after_cart_table', array($this, 'display_shipping_info_box'), 10);
+        add_action('woocommerce_before_checkout_form', array($this, 'display_shipping_info_box'), 10);
     }
 
     /**
@@ -740,11 +744,9 @@ class Woo_Excel_Mng_Frontend
             "SELECT DISTINCT destination_city FROM $table_name WHERE is_active = 1 ORDER BY destination_city"
         ));
 
-        // محاسبه وزن هر آیتم و جمع کل + اطلاعات کامل
-        $cart_items_details = array();
+        // محاسبه وزن هر آیتم و جمع کل
         $total_weight = 0;
         $cart_total = 0;
-        $total_meterage = 0;
 
         foreach (WC()->cart->get_cart() as $cart_item_key => $cart_item) {
             $product = $cart_item['data'];
@@ -795,15 +797,6 @@ class Woo_Excel_Mng_Frontend
             } else {
                 $item_weight = floatval($product->get_weight()) * $meterage;
             }
-
-            $cart_items_details[] = array(
-                'name' => $product_name,
-                'meterage' => $meterage,
-                'length' => $length,
-                'color' => $color,
-                'thickness' => $thickness,
-                'weight' => $item_weight
-            );
 
             $total_weight += $item_weight;
 
@@ -905,40 +898,7 @@ class Woo_Excel_Mng_Frontend
                 </select>
             </div>
 
-            <!-- جزئیات آیتم‌ها -->
-            <div class="woo-excel-items-weights">
-                <h4><?php _e('جزئیات آیتم‌ها:', 'woo-excel-mng'); ?></h4>
-                <table class="woo-excel-weights-table">
-                    <thead>
-                        <tr>
-                            <th><?php _e('محصول', 'woo-excel-mng'); ?></th>
-                            <th><?php _e('متراژ', 'woo-excel-mng'); ?></th>
-                            <th><?php _e('طول', 'woo-excel-mng'); ?></th>
-                            <th><?php _e('رنگ', 'woo-excel-mng'); ?></th>
-                            <th><?php _e('ضخامت', 'woo-excel-mng'); ?></th>
-                            <th><?php _e('وزن', 'woo-excel-mng'); ?></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($cart_items_details as $item): ?>
-                            <tr>
-                                <td><?php echo esc_html($item['name']); ?></td>
-                                <td class="meterage-value"><?php echo esc_html(woo_excel_mng_format_number($item['meterage'], 2, '.', '')); ?> <?php _e('متر', 'woo-excel-mng'); ?></td>
-                                <td><?php echo esc_html($item['length'] ? $item['length'] : '-'); ?></td>
-                                <td><?php echo esc_html($item['color'] ? $item['color'] : '-'); ?></td>
-                                <td><?php echo esc_html($item['thickness'] ? $item['thickness'] : '-'); ?></td>
-                                <td class="weight-value"><?php echo wc_format_weight($item['weight']); ?></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                    <tfoot>
-                        <tr class="total-weight-row">
-                            <td colspan="5"><strong><?php _e('جمع کل وزن:', 'woo-excel-mng'); ?></strong></td>
-                            <td class="weight-value"><strong><?php echo wc_format_weight($total_weight); ?></strong></td>
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
+            <!-- جزئیات آیتم‌ها حذف شد -->
 
             <!-- اطلاعات حمل‌ونقل -->
             <?php if ($destination_city): ?>
