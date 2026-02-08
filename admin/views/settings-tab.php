@@ -89,11 +89,11 @@ $shipping_percentage_display = woo_excel_mng_format_number($shipping_percentage,
         </div>
 
         <div class="settings-section">
-            <h3><?php _e('حداکثر طول بار (متر)', 'woo-excel-mng'); ?></h3>
+            <h3><?php _e('حداکثر متراژ سفارش (متر)', 'woo-excel-mng'); ?></h3>
 
             <div class="form-group">
                 <label for="woo_excel_mng_peykan_max_length">
-                    <?php _e('پیکان (حداکثر طول)', 'woo-excel-mng'); ?>
+                    <?php _e('پیکان (حداکثر متراژ)', 'woo-excel-mng'); ?>
                 </label>
                 <input type="number"
                        name="woo_excel_mng_peykan_max_length"
@@ -108,7 +108,7 @@ $shipping_percentage_display = woo_excel_mng_format_number($shipping_percentage,
 
             <div class="form-group">
                 <label for="woo_excel_mng_mazda_max_length">
-                    <?php _e('مزدا (حداکثر طول)', 'woo-excel-mng'); ?>
+                    <?php _e('مزدا (حداکثر متراژ)', 'woo-excel-mng'); ?>
                 </label>
                 <input type="number"
                        name="woo_excel_mng_mazda_max_length"
@@ -123,7 +123,7 @@ $shipping_percentage_display = woo_excel_mng_format_number($shipping_percentage,
 
             <div class="form-group">
                 <label for="woo_excel_mng_nissan_max_length">
-                    <?php _e('نیسان (حداکثر طول)', 'woo-excel-mng'); ?>
+                    <?php _e('نیسان (حداکثر متراژ)', 'woo-excel-mng'); ?>
                 </label>
                 <input type="number"
                        name="woo_excel_mng_nissan_max_length"

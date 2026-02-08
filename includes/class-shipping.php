@@ -122,7 +122,7 @@ class Woo_Excel_Mng_Shipping {
     /**
      * محاسبه هزینه حمل‌ونقل
      */
-    public static function calculate_shipping_cost($origin_city, $destination_city, $total_weight, $max_length = 0) {
+    public static function calculate_shipping_cost($origin_city, $destination_city, $total_weight, $total_meterage = 0) {
         global $wpdb;
         $table_name = $wpdb->prefix . 'woo_excel_shipping_routes';
         
@@ -140,8 +140,10 @@ class Woo_Excel_Mng_Shipping {
             return null;
         }
         
-        // تعیین وسیله نقلیه بر اساس وزن و طول
-        $vehicle = self::select_vehicle_by_weight_and_length($total_weight, $max_length);
+        // تعیین وسیله نقلیه بر اساس وزن و متراژ
+        $vehicle_by_weight = self::select_vehicle($total_weight);
+        $vehicle_by_meterage = self::select_vehicle_by_meterage($total_meterage);
+        $vehicle = self::select_vehicle_by_weight_and_meterage($total_weight, $total_meterage);
         
         $cost = 0;
         switch ($vehicle) {
@@ -158,7 +160,10 @@ class Woo_Excel_Mng_Shipping {
         
         return array(
             'vehicle' => $vehicle,
-            'cost' => $cost
+            'cost' => $cost,
+            'vehicle_by_weight' => $vehicle_by_weight,
+            'vehicle_by_meterage' => $vehicle_by_meterage,
+            'upgraded_by_meterage' => self::is_meterage_upgrade($vehicle_by_weight, $vehicle_by_meterage),
         );
     }
     
@@ -176,9 +181,9 @@ class Woo_Excel_Mng_Shipping {
     }
 
     /**
-     * دریافت محدودیت طول برای هر وسیله
+     * دریافت محدودیت متراژ برای هر وسیله
      */
-    public static function get_length_limits() {
+    public static function get_meterage_limits() {
         return array(
             'peykan' => floatval(get_option('woo_excel_mng_peykan_max_length', 4)),
             'mazda' => floatval(get_option('woo_excel_mng_mazda_max_length', 5)),
@@ -187,28 +192,28 @@ class Woo_Excel_Mng_Shipping {
     }
 
     /**
-     * انتخاب وسیله نقلیه بر اساس طول
+     * انتخاب وسیله نقلیه بر اساس متراژ
      */
-    public static function select_vehicle_by_length($length) {
-        $length = floatval($length);
-        if ($length <= 0) {
+    public static function select_vehicle_by_meterage($meterage) {
+        $meterage = floatval($meterage);
+        if ($meterage <= 0) {
             return null;
         }
 
-        $limits = self::get_length_limits();
+        $limits = self::get_meterage_limits();
         $peykan_max = max(0, floatval($limits['peykan']));
         $mazda_max = max(0, floatval($limits['mazda']));
         $nissan_max = max(0, floatval($limits['nissan']));
 
-        if ($peykan_max > 0 && $length <= $peykan_max) {
+        if ($peykan_max > 0 && $meterage <= $peykan_max) {
             return 'peykan';
         }
 
-        if ($mazda_max > 0 && $length <= $mazda_max) {
+        if ($mazda_max > 0 && $meterage <= $mazda_max) {
             return 'mazda';
         }
 
-        if ($nissan_max > 0 && $length <= $nissan_max) {
+        if ($nissan_max > 0 && $meterage <= $nissan_max) {
             return 'nissan';
         }
 
@@ -216,13 +221,13 @@ class Woo_Excel_Mng_Shipping {
     }
 
     /**
-     * انتخاب وسیله نقلیه بر اساس وزن و طول (اولویت با بزرگ‌تر)
+     * انتخاب وسیله نقلیه بر اساس وزن و متراژ (اولویت با بزرگ‌تر)
      */
-    public static function select_vehicle_by_weight_and_length($weight, $length) {
+    public static function select_vehicle_by_weight_and_meterage($weight, $meterage) {
         $by_weight = self::select_vehicle($weight);
-        $by_length = self::select_vehicle_by_length($length);
+        $by_meterage = self::select_vehicle_by_meterage($meterage);
 
-        if (!$by_length) {
+        if (!$by_meterage) {
             return $by_weight;
         }
 
@@ -232,7 +237,24 @@ class Woo_Excel_Mng_Shipping {
             'nissan' => 3,
         );
 
-        return ($priority[$by_length] >= $priority[$by_weight]) ? $by_length : $by_weight;
+        return ($priority[$by_meterage] >= $priority[$by_weight]) ? $by_meterage : $by_weight;
+    }
+
+    /**
+     * آیا انتخاب بر اساس متراژ ارتقا داده شده است؟
+     */
+    public static function is_meterage_upgrade($vehicle_by_weight, $vehicle_by_meterage) {
+        if (!$vehicle_by_meterage) {
+            return false;
+        }
+
+        $priority = array(
+            'peykan' => 1,
+            'mazda' => 2,
+            'nissan' => 3,
+        );
+
+        return $priority[$vehicle_by_meterage] > $priority[$vehicle_by_weight];
     }
     
     /**

@@ -224,6 +224,22 @@
     border-top: 2px solid #f0f0f0;
 }
 
+.woo-excel-vehicle-change-alert {
+    background: #ffe066;
+    border: 2px solid #e67700;
+    border-radius: 8px;
+    padding: 15px 20px;
+    margin-bottom: 15px;
+    color: #8a4b00;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(230, 119, 0, 0.25);
+}
+
+.woo-excel-vehicle-change-alert p {
+    margin: 8px 0 0 0;
+    font-weight: 500;
+}
+
 .woo-excel-free-shipping-badge {
     background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
     color: #fff;
