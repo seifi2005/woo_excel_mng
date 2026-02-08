@@ -20,7 +20,12 @@ class Woo_Excel_Mng_Products {
         // گروه‌بندی محصولات بر اساس نام
         $products_grouped = array();
         foreach ($products_data as $data) {
-            $product_name = $data['product'];
+            $product_name = self::normalize_product_name($data['product']);
+            if (empty($product_name)) {
+                continue;
+            }
+
+            $data['product'] = $product_name;
             if (!isset($products_grouped[$product_name])) {
                 $products_grouped[$product_name] = array();
             }
@@ -90,32 +95,65 @@ class Woo_Excel_Mng_Products {
             'errors' => $errors
         );
     }
+
+    /**
+     * نرمال‌سازی نام محصول برای جستجو
+     */
+    private static function normalize_product_name($product_name) {
+        $product_name = wp_unslash($product_name);
+        $product_name = trim((string) $product_name);
+        $product_name = preg_replace('/\s+/u', ' ', $product_name);
+        return $product_name;
+    }
+
+    /**
+     * یافتن محصول موجود بر اساس نام یا اسلاگ
+     */
+    private static function find_existing_product_id($product_name) {
+        $product_name = self::normalize_product_name($product_name);
+        if (empty($product_name)) {
+            return 0;
+        }
+
+        global $wpdb;
+
+        $post_id = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT ID FROM {$wpdb->posts} WHERE post_type = 'product' AND post_title = %s LIMIT 1",
+                $product_name
+            )
+        );
+
+        if ($post_id) {
+            return (int) $post_id;
+        }
+
+        $slug = sanitize_title($product_name);
+        if ($slug) {
+            $post_id = $wpdb->get_var(
+                $wpdb->prepare(
+                    "SELECT ID FROM {$wpdb->posts} WHERE post_type = 'product' AND post_name = %s LIMIT 1",
+                    $slug
+                )
+            );
+        }
+
+        return $post_id ? (int) $post_id : 0;
+    }
     
     /**
      * یافتن یا ایجاد محصول متغیر
      */
     private static function get_or_create_variable_product($product_name) {
-        // جستجوی محصول متغیر موجود
-        $existing_variable = wc_get_products(array(
-            'name' => $product_name,
-            'type' => 'variable',
-            'limit' => 1,
-            'return' => 'ids'
-        ));
-
-        if (!empty($existing_variable)) {
-            return $existing_variable[0];
+        $product_name = self::normalize_product_name($product_name);
+        if (empty($product_name)) {
+            return new WP_Error('invalid_product_name', __('نام محصول نامعتبر است.', 'woo-excel-mng'));
         }
 
-        // اگر محصولی با همین نام وجود دارد، آن را به متغیر تبدیل کن
-        $existing_any = wc_get_products(array(
-            'name' => $product_name,
-            'limit' => 1,
-            'return' => 'ids'
-        ));
-
-        if (!empty($existing_any)) {
-            return self::ensure_variable_product($existing_any[0]);
+        // اگر محصولی با همین نام وجود دارد، از آن استفاده کن
+        $existing_id = self::find_existing_product_id($product_name);
+        if ($existing_id) {
+            return self::ensure_variable_product($existing_id);
         }
         
         // ایجاد محصول جدید
