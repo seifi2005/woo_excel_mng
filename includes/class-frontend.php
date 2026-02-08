@@ -456,10 +456,10 @@ class Woo_Excel_Mng_Frontend
 
         $html  = '<div class="woo-excel-meterage-qty">';
         $html .= '<label class="screen-reader-text" for="woo-excel-meterage-' . esc_attr($cart_item_key) . '">' . esc_html__('متراژ (متر)', 'woo-excel-mng') . '</label>';
-        $html .= '<input type="number" class="input-text qty text woo-excel-meterage-input" ';
+        $html .= '<input type="text" class="input-text qty text woo-excel-meterage-input" ';
         $html .= 'name="' . esc_attr(self::CART_ITEM_METERAGE_KEY) . '[' . esc_attr($cart_item_key) . ']" ';
         $html .= 'id="woo-excel-meterage-' . esc_attr($cart_item_key) . '" ';
-        $html .= 'value="' . esc_attr($meterage_formatted) . '" step="' . esc_attr($this->get_meterage_step()) . '" min="' . esc_attr($this->get_meterage_min()) . '" inputmode="decimal" />';
+        $html .= 'value="' . esc_attr($meterage_formatted) . '" data-step="' . esc_attr($this->get_meterage_step()) . '" data-min="' . esc_attr($this->get_meterage_min()) . '" inputmode="decimal" />';
         $html .= '<input type="hidden" name="cart[' . esc_attr($cart_item_key) . '][qty]" value="1" />';
         $html .= '</div>';
 
@@ -1145,9 +1145,10 @@ class Woo_Excel_Mng_Frontend
                         if ($row.find('.woo-excel-meterage-display').length > 0) {
                             // تنظیم step و min برای جلوگیری از گرد شدن
                             $input.attr({
-                                'step': '<?php echo esc_js($this->get_meterage_step()); ?>',
-                                'min': '<?php echo esc_js($this->get_meterage_min()); ?>',
-                                'type': 'number'
+                                'data-step': '<?php echo esc_js($this->get_meterage_step()); ?>',
+                                'data-min': '<?php echo esc_js($this->get_meterage_min()); ?>',
+                                'type': 'text',
+                                'inputmode': 'decimal'
                             });
                         }
                     });

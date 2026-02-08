@@ -55,6 +55,7 @@
                 $productQtyInput.attr({
                     'step': meterageStep,
                     'min': meterageMin,
+                    'type': 'text',
                     'inputmode': 'decimal'
                 });
             }
@@ -91,6 +92,7 @@
             $quantityInput.attr({
                 'step': meterageStep,
                 'min': meterageMin,
+                'type': 'text',
                 'inputmode': 'decimal'
             });
 
@@ -237,7 +239,8 @@
                     $input.attr({
                         'step': meterageStep,
                         'min': meterageMin,
-                        'type': 'number'
+                        'type': 'text',
+                        'inputmode': 'decimal'
                     });
                 }
             });
