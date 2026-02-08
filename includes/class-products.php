@@ -95,16 +95,27 @@ class Woo_Excel_Mng_Products {
      * یافتن یا ایجاد محصول متغیر
      */
     private static function get_or_create_variable_product($product_name) {
-        // جستجوی محصول موجود
-        $existing = wc_get_products(array(
+        // جستجوی محصول متغیر موجود
+        $existing_variable = wc_get_products(array(
             'name' => $product_name,
             'type' => 'variable',
             'limit' => 1,
             'return' => 'ids'
         ));
-        
-        if (!empty($existing)) {
-            return $existing[0];
+
+        if (!empty($existing_variable)) {
+            return $existing_variable[0];
+        }
+
+        // اگر محصولی با همین نام وجود دارد، آن را به متغیر تبدیل کن
+        $existing_any = wc_get_products(array(
+            'name' => $product_name,
+            'limit' => 1,
+            'return' => 'ids'
+        ));
+
+        if (!empty($existing_any)) {
+            return self::ensure_variable_product($existing_any[0]);
         }
         
         // ایجاد محصول جدید
@@ -116,6 +127,44 @@ class Woo_Excel_Mng_Products {
         $product->save();
         
         return $product->get_id();
+    }
+
+    /**
+     * اطمینان از اینکه محصول والد متغیر است
+     */
+    private static function ensure_variable_product($product_id) {
+        $product = wc_get_product($product_id);
+
+        if (!$product) {
+            return new WP_Error('product_not_found', __('محصول والد یافت نشد.', 'woo-excel-mng'));
+        }
+
+        if ($product->is_type('variable')) {
+            return $product_id;
+        }
+
+        if ($product->is_type('variation')) {
+            return new WP_Error('invalid_product', __('محصول والد نامعتبر است.', 'woo-excel-mng'));
+        }
+
+        // تبدیل محصول ساده به متغیر
+        wp_set_object_terms($product_id, 'variable', 'product_type', false);
+
+        $product = wc_get_product($product_id);
+        if ($product && $product->is_type('variable')) {
+            return $product_id;
+        }
+
+        // تلاش مجدد با ساخت نمونه متغیر
+        $variable_product = new WC_Product_Variable($product_id);
+        $variable_product->save();
+
+        $product = wc_get_product($product_id);
+        if ($product && $product->is_type('variable')) {
+            return $product_id;
+        }
+
+        return new WP_Error('invalid_product', __('محصول والد نامعتبر است.', 'woo-excel-mng'));
     }
     
     /**
@@ -208,6 +257,14 @@ class Woo_Excel_Mng_Products {
     private static function create_or_update_variation_fixed($product_id, $variation_data) {
         // دریافت محصول والد برای دسترسی به attributes
         $parent_product = wc_get_product($product_id);
+        if (!$parent_product || !$parent_product->is_type('variable')) {
+            $ensure_result = self::ensure_variable_product($product_id);
+            if (is_wp_error($ensure_result)) {
+                return $ensure_result;
+            }
+            $parent_product = wc_get_product($product_id);
+        }
+
         if (!$parent_product || !$parent_product->is_type('variable')) {
             return new WP_Error('invalid_product', __('محصول والد نامعتبر است.', 'woo-excel-mng'));
         }
