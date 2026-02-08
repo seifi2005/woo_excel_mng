@@ -1008,44 +1008,6 @@ class Woo_Excel_Mng_Frontend
             <?php endif; ?>
         </div>
 
-        <script type="text/javascript">
-            jQuery(document).ready(function($) {
-                $('#woo_excel_destination_city_cart').on('change', function() {
-                    var city = $(this).val();
-                    var $select = $(this);
-
-                    // نمایش loading
-                    $select.prop('disabled', true);
-
-                    $.ajax({
-                        url: wooExcelMngFrontend.ajax_url,
-                        type: 'POST',
-                        data: {
-                            action: 'woo_excel_mng_save_destination_city',
-                            nonce: wooExcelMngFrontend.nonce,
-                            city: city
-                        },
-                        success: function(response) {
-                            if (response && response.success) {
-                                // به‌روزرسانی cart totals
-                                $('body').trigger('update_checkout');
-                                // رفرش صفحه برای نمایش اطلاعات جدید
-                                window.location.reload();
-                            } else {
-                                var errorMsg = (response && response.data) ? response.data : 'خطا در ذخیره شهر';
-                                alert('خطا: ' + errorMsg);
-                                $select.prop('disabled', false);
-                            }
-                        },
-                        error: function(xhr, status, error) {
-                            console.error('AJAX Error:', status, error);
-                            alert('خطا در ارتباط با سرور. لطفاً دوباره تلاش کنید.');
-                            $select.prop('disabled', false);
-                        }
-                    });
-                });
-            });
-        </script>
     <?php
     }
 

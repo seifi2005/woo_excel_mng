@@ -366,30 +366,52 @@
         });
         
         // ===== مدیریت انتخاب شهر مقصد =====
-        if ($('#woo_excel_destination_city').length) {
-            $('#woo_excel_destination_city').on('change', function() {
-                var city = $(this).val();
-                
-                if (!city) {
-                    return;
-                }
-                
-                // ذخیره در session
-                $.ajax({
-                    url: wooExcelMngFrontend.ajax_url,
-                    type: 'POST',
-                    data: {
-                        action: 'woo_excel_mng_save_destination_city',
-                        nonce: wooExcelMngFrontend.nonce,
-                        city: city
-                    },
-                    success: function() {
-                        // به‌روزرسانی نرخ‌های حمل‌ونقل
-                        $('body').trigger('update_checkout');
+        function saveDestinationCity(city, $select) {
+            if (!city) {
+                return;
+            }
+
+            if ($select && $select.length) {
+                $select.prop('disabled', true);
+            }
+
+            $.ajax({
+                url: wooExcelMngFrontend.ajax_url,
+                type: 'POST',
+                data: {
+                    action: 'woo_excel_mng_save_destination_city',
+                    nonce: wooExcelMngFrontend.nonce,
+                    city: city
+                },
+                success: function(response) {
+                    if (response && response.success) {
+                        if ($('body').hasClass('woocommerce-cart')) {
+                            window.location.reload();
+                        } else {
+                            $('body').trigger('update_checkout');
+                        }
+                    } else {
+                        var errorMsg = (response && response.data) ? response.data : 'خطا در ذخیره شهر';
+                        alert('خطا: ' + errorMsg);
+                        if ($select && $select.length) {
+                            $select.prop('disabled', false);
+                        }
                     }
-                });
+                },
+                error: function() {
+                    alert('خطا در ارتباط با سرور. لطفاً دوباره تلاش کنید.');
+                    if ($select && $select.length) {
+                        $select.prop('disabled', false);
+                    }
+                }
             });
         }
+
+        $(document).on('change', '#woo_excel_destination_city, .woo-excel-city-select', function() {
+            var $select = $(this);
+            var city = $select.val();
+            saveDestinationCity(city, $select);
+        });
         
     });
     
