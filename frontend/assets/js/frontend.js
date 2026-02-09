@@ -245,13 +245,28 @@
                 }
             });
         }
+
+        function hideDefaultQuantityInputs() {
+            if ($('input[name="woo_excel_meterage"]').length) {
+                $('.quantity input.qty[name="quantity"]').not('[type="hidden"]').closest('.quantity').find('input.qty[name="quantity"]').hide();
+            }
+
+            $('table.cart tr.cart_item').each(function() {
+                var $row = $(this);
+                if ($row.find('input.woo-excel-meterage-input').length) {
+                    $row.find('input.qty[name^="cart"]').not('[type="hidden"]').hide();
+                }
+            });
+        }
         
         // اجرا هنگام بارگذاری صفحه
         setupCartQuantityInputs();
+        hideDefaultQuantityInputs();
         
         // اجرا بعد از به‌روزرسانی سبد خرید
         $(document).on('updated_wc_div', function() {
             setTimeout(setupCartQuantityInputs, 100);
+            setTimeout(hideDefaultQuantityInputs, 100);
         });
         
         // ===== مدیریت تغییر quantity در سبد خرید =====

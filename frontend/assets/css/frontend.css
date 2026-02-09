@@ -224,6 +224,22 @@
     border-top: 2px solid #f0f0f0;
 }
 
+.woo-excel-shipping-note {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 15px;
+    background: #f6f7fb;
+    border: 1px solid #e2e4e7;
+    border-radius: 8px;
+    color: #50575e;
+    font-weight: 500;
+}
+
+.woo-excel-shipping-note .dashicons {
+    color: #2271b1;
+}
+
 .woo-excel-vehicle-change-alert {
     background: #ffe066;
     border: 2px solid #e67700;

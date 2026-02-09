@@ -76,8 +76,8 @@ class Woo_Excel_Mng_Frontend
 
         // بلاک حمل رایگان قدیمی حذف شد - حالا در display_shipping_info_box نمایش داده می‌شود
 
-        // اضافه کردن فیلد انتخاب شهر مقصد در صفحه تسویه حساب
-        add_action('woocommerce_after_order_notes', array($this, 'add_destination_city_field'));
+        // حذف فیلدهای پیش‌فرض و نمایش فیلدهای مورد نیاز
+        add_filter('woocommerce_checkout_fields', array($this, 'customize_checkout_fields'), 20, 1);
         add_action('woocommerce_checkout_process', array($this, 'validate_destination_city'));
         add_action('woocommerce_checkout_update_order_meta', array($this, 'save_destination_city'));
 
@@ -116,7 +116,7 @@ class Woo_Excel_Mng_Frontend
 
         // نمایش باکس حمل‌ونقل در سبد خرید و تسویه حساب
         add_action('woocommerce_after_cart_table', array($this, 'display_shipping_info_box'), 10);
-        add_action('woocommerce_before_checkout_form', array($this, 'display_shipping_info_box'), 10);
+        add_action('woocommerce_checkout_before_customer_details', array($this, 'display_shipping_info_box'), 10);
     }
 
     /**
@@ -249,6 +249,24 @@ class Woo_Excel_Mng_Frontend
         }
 
         return round($meterage, 2);
+    }
+
+    /**
+     * دریافت گزینه‌های شهر مقصد
+     */
+    private function get_destination_city_options() {
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'woo_excel_shipping_routes';
+        $cities = $wpdb->get_col("SELECT DISTINCT destination_city FROM $table_name WHERE is_active = 1 ORDER BY destination_city");
+
+        $options = array('' => __('-- انتخاب شهر --', 'woo-excel-mng'));
+        if (!empty($cities)) {
+            foreach ($cities as $city) {
+                $options[$city] = $city;
+            }
+        }
+
+        return $options;
     }
 
     /**
@@ -738,11 +756,10 @@ class Woo_Excel_Mng_Frontend
         $destination_city = WC()->session->get('woo_excel_destination_city', '');
 
         // دریافت لیست شهرهای موجود
-        global $wpdb;
-        $table_name = $wpdb->prefix . 'woo_excel_shipping_routes';
-        $cities = $wpdb->get_col($wpdb->prepare(
-            "SELECT DISTINCT destination_city FROM $table_name WHERE is_active = 1 ORDER BY destination_city"
-        ));
+        $city_options = $this->get_destination_city_options();
+        if (count($city_options) <= 1) {
+            return;
+        }
 
         // محاسبه وزن هر آیتم و جمع کل
         $total_weight = 0;
@@ -883,25 +900,30 @@ class Woo_Excel_Mng_Frontend
         <div class="woo-excel-shipping-info-box">
             <h3><?php _e('اطلاعات حمل‌ونقل', 'woo-excel-mng'); ?></h3>
 
-            <!-- انتخاب شهر مقصد -->
-            <div class="woo-excel-destination-selector">
-                <label for="woo_excel_destination_city_cart">
-                    <strong><?php _e('شهر مقصد:', 'woo-excel-mng'); ?></strong>
-                </label>
-                <select id="woo_excel_destination_city_cart" name="woo_excel_destination_city" class="woo-excel-city-select">
-                    <option value=""><?php _e('-- انتخاب شهر --', 'woo-excel-mng'); ?></option>
-                    <?php foreach ($cities as $city): ?>
-                        <option value="<?php echo esc_attr($city); ?>" <?php selected($destination_city, $city); ?>>
-                            <?php echo esc_html($city); ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
+            <?php if ($is_cart): ?>
+                <div class="woo-excel-shipping-note">
+                    <span class="dashicons dashicons-info"></span>
+                    <p><?php _e('هزینه حمل در مرحله بعد محاسبه می‌شود.', 'woo-excel-mng'); ?></p>
+                </div>
+            <?php else: ?>
+                <!-- انتخاب شهر مقصد -->
+                <div class="woo-excel-destination-selector">
+                    <?php
+                    woocommerce_form_field('woo_excel_destination_city', array(
+                        'type' => 'select',
+                        'class' => array('woo-excel-city-select'),
+                        'label' => __('شهر مقصد', 'woo-excel-mng'),
+                        'required' => true,
+                        'options' => $city_options,
+                    ), $destination_city);
+                    ?>
+                </div>
+            <?php endif; ?>
 
             <!-- جزئیات آیتم‌ها حذف شد -->
 
             <!-- اطلاعات حمل‌ونقل -->
-            <?php if ($destination_city): ?>
+            <?php if (!$is_cart && $destination_city): ?>
                 <div class="woo-excel-shipping-details">
                     <?php if ($vehicle_upgrade_notice): ?>
                         <div class="woo-excel-vehicle-change-alert">
@@ -1001,7 +1023,7 @@ class Woo_Excel_Mng_Frontend
                         <?php endif; ?>
                     <?php endif; ?>
                 </div>
-            <?php else: ?>
+            <?php elseif (!$is_cart): ?>
                 <div class="woo-excel-select-city-notice">
                     <p><?php _e('لطفاً شهر مقصد را انتخاب کنید تا هزینه حمل محاسبه شود.', 'woo-excel-mng'); ?></p>
                 </div>
@@ -1205,6 +1227,45 @@ class Woo_Excel_Mng_Frontend
     }
 
     /**
+     * حذف فیلدهای پیش‌فرض و نمایش فیلدهای مورد نیاز در تسویه حساب
+     */
+    public function customize_checkout_fields($fields) {
+        $fields['billing'] = array(
+            'billing_first_name' => array(
+                'label' => __('نام', 'woo-excel-mng'),
+                'required' => true,
+                'class' => array('form-row-first'),
+                'priority' => 10,
+            ),
+            'billing_last_name' => array(
+                'label' => __('نام خانوادگی', 'woo-excel-mng'),
+                'required' => true,
+                'class' => array('form-row-last'),
+                'priority' => 20,
+            ),
+            'billing_phone' => array(
+                'label' => __('شماره همراه', 'woo-excel-mng'),
+                'required' => true,
+                'type' => 'tel',
+                'class' => array('form-row-wide'),
+                'priority' => 30,
+            ),
+            'billing_address_1' => array(
+                'label' => __('آدرس', 'woo-excel-mng'),
+                'required' => true,
+                'type' => 'textarea',
+                'class' => array('form-row-wide'),
+                'priority' => 40,
+            ),
+        );
+
+        $fields['shipping'] = array();
+        $fields['order'] = array();
+
+        return $fields;
+    }
+
+    /**
      * محاسبه قیمت و وزن بر اساس متراژ
      * استفاده از flag برای جلوگیری از حلقه بی‌نهایت
      */
@@ -1325,6 +1386,11 @@ class Woo_Excel_Mng_Frontend
 
         // جلوگیری از اجرا در admin (به جز AJAX)
         if (is_admin() && !defined('DOING_AJAX')) {
+            return;
+        }
+
+        // نمایش هزینه حمل فقط در مرحله تسویه حساب
+        if (function_exists('is_cart') && is_cart()) {
             return;
         }
 
