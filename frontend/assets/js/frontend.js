@@ -267,15 +267,32 @@
                 }
             });
         }
+
+        function forceDecimalQuantityInputs() {
+            $('.quantity input.qty, input.woo-excel-meterage-input').not('[type="hidden"]').each(function() {
+                var $input = $(this);
+                $input.attr({
+                    'type': 'text',
+                    'inputmode': 'decimal'
+                });
+                $input.removeAttr('step').removeAttr('min').removeAttr('max');
+            });
+        }
         
         // اجرا هنگام بارگذاری صفحه
         setupCartQuantityInputs();
         hideDefaultQuantityInputs();
+        forceDecimalQuantityInputs();
         
         // اجرا بعد از به‌روزرسانی سبد خرید
         $(document).on('updated_wc_div', function() {
             setTimeout(setupCartQuantityInputs, 100);
             setTimeout(hideDefaultQuantityInputs, 100);
+            setTimeout(forceDecimalQuantityInputs, 100);
+        });
+
+        $(document).on('found_variation', function() {
+            setTimeout(forceDecimalQuantityInputs, 0);
         });
         
         // ===== مدیریت تغییر quantity در سبد خرید =====
