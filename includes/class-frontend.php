@@ -76,8 +76,9 @@ class Woo_Excel_Mng_Frontend
 
         // بلاک حمل رایگان قدیمی حذف شد - حالا در display_shipping_info_box نمایش داده می‌شود
 
-        // اضافه کردن فیلد انتخاب شهر مقصد در صفحه تسویه حساب
-        add_action('woocommerce_after_order_notes', array($this, 'add_destination_city_field'));
+        // حذف فیلدهای پیش‌فرض و نمایش فیلدهای مورد نیاز
+        add_filter('woocommerce_checkout_fields', array($this, 'customize_checkout_fields'), 20, 1);
+        add_action('wp', array($this, 'reposition_checkout_billing_fields'));
         add_action('woocommerce_checkout_process', array($this, 'validate_destination_city'));
         add_action('woocommerce_checkout_update_order_meta', array($this, 'save_destination_city'));
 
@@ -113,6 +114,16 @@ class Woo_Excel_Mng_Frontend
 
         // غیرفعال کردن کد تخفیف در سبد خرید
         add_filter('woocommerce_coupons_enabled', array($this, 'disable_cart_coupons'), 10, 1);
+
+        // نمایش باکس حمل‌ونقل در سبد خرید و تسویه حساب
+        add_action('woocommerce_after_cart_table', array($this, 'display_shipping_info_box'), 10);
+        add_action('woocommerce_checkout_after_order_review', array($this, 'display_shipping_info_box'), 20);
+        add_action('woocommerce_before_checkout_form', array($this, 'render_checkout_shipping_summary'), 5);
+        add_filter('woocommerce_update_order_review_fragments', array($this, 'add_checkout_shipping_summary_fragment'), 10, 1);
+
+        // مخفی کردن حمل‌ونقل در سبد خرید
+        add_filter('woocommerce_cart_needs_shipping', array($this, 'disable_cart_shipping_display'), 20, 1);
+        add_filter('woocommerce_cart_totals_needs_shipping', array($this, 'disable_cart_shipping_display'), 20, 1);
     }
 
     /**
@@ -233,18 +244,105 @@ class Woo_Excel_Mng_Frontend
     }
 
     /**
-     * نرمال‌سازی متراژ بر اساس گام
+     * نرمال‌سازی متراژ
      */
     private function normalize_meterage_value($value)
     {
         $meterage = floatval($value);
-        $step = $this->get_meterage_step();
+        return round($meterage, 2);
+    }
 
-        if ($step > 0) {
-            $meterage = round($meterage / $step) * $step;
+    /**
+     * محاسبه خلاصه هزینه حمل برای نمایش
+     */
+    private function get_shipping_summary($destination_city) {
+        if (!$destination_city || !WC()->cart || WC()->cart->is_empty()) {
+            return null;
         }
 
-        return round($meterage, 2);
+        $origin_city = get_option('woo_excel_mng_origin_city', 'تهران');
+        $premium_threshold = floatval(get_option('woo_excel_mng_premium_threshold', 65000000));
+        $shipping_percentage = floatval(get_option('woo_excel_mng_shipping_percentage', 2)) / 100;
+
+        $total_weight = 0;
+        $cart_total = 0;
+
+        foreach (WC()->cart->get_cart() as $cart_item) {
+            if (isset($cart_item['woo_excel_calculated_weight'])) {
+                $total_weight += floatval($cart_item['woo_excel_calculated_weight']);
+            } else {
+                $product = $cart_item['data'];
+                $meterage = isset($cart_item[self::CART_ITEM_METERAGE_KEY])
+                    ? floatval($cart_item[self::CART_ITEM_METERAGE_KEY])
+                    : (isset($cart_item['quantity']) ? floatval($cart_item['quantity']) : 1);
+                $product_weight = floatval($product->get_weight());
+                if ($product_weight > 0) {
+                    $total_weight += $product_weight * $meterage;
+                }
+            }
+
+            if (isset($cart_item['woo_excel_calculated_price'])) {
+                $cart_total += floatval($cart_item['woo_excel_calculated_price']);
+            } else {
+                $item_price = floatval($cart_item['data']->get_price());
+                $quantity = isset($cart_item['quantity']) ? floatval($cart_item['quantity']) : 1;
+                $cart_total += $item_price * $quantity;
+            }
+        }
+
+        if ($total_weight <= 0) {
+            return null;
+        }
+
+        $max_meterage = $this->get_cart_max_meterage(WC()->cart->get_cart());
+        $shipping_result = Woo_Excel_Mng_Shipping::calculate_shipping_cost(
+            $origin_city,
+            $destination_city,
+            $total_weight,
+            $max_meterage
+        );
+
+        if (!$shipping_result) {
+            return null;
+        }
+
+        $base_cost = floatval($shipping_result['cost']);
+        $vehicle = $shipping_result['vehicle'];
+        $is_premium_mode = ($cart_total >= $premium_threshold);
+        $shipping_cost = $base_cost;
+        $is_free_shipping = false;
+
+        if ($is_premium_mode) {
+            $shipping_percentage_amount = $cart_total * $shipping_percentage;
+            if ($base_cost <= $shipping_percentage_amount) {
+                $is_free_shipping = true;
+                $shipping_cost = 0;
+            }
+        }
+
+        return array(
+            'vehicle' => $vehicle,
+            'shipping_cost' => $shipping_cost,
+            'is_free' => $is_free_shipping,
+        );
+    }
+
+    /**
+     * دریافت گزینه‌های شهر مقصد
+     */
+    private function get_destination_city_options() {
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'woo_excel_shipping_routes';
+        $cities = $wpdb->get_col("SELECT DISTINCT destination_city FROM $table_name WHERE is_active = 1 ORDER BY destination_city");
+
+        $options = array('' => __('-- انتخاب شهر --', 'woo-excel-mng'));
+        if (!empty($cities)) {
+            foreach ($cities as $city) {
+                $options[$city] = $city;
+            }
+        }
+
+        return $options;
     }
 
     /**
@@ -452,10 +550,10 @@ class Woo_Excel_Mng_Frontend
 
         $html  = '<div class="woo-excel-meterage-qty">';
         $html .= '<label class="screen-reader-text" for="woo-excel-meterage-' . esc_attr($cart_item_key) . '">' . esc_html__('متراژ (متر)', 'woo-excel-mng') . '</label>';
-        $html .= '<input type="number" class="input-text qty text woo-excel-meterage-input" ';
+        $html .= '<input type="text" class="input-text qty text woo-excel-meterage-input" ';
         $html .= 'name="' . esc_attr(self::CART_ITEM_METERAGE_KEY) . '[' . esc_attr($cart_item_key) . ']" ';
         $html .= 'id="woo-excel-meterage-' . esc_attr($cart_item_key) . '" ';
-        $html .= 'value="' . esc_attr($meterage_formatted) . '" step="' . esc_attr($this->get_meterage_step()) . '" min="' . esc_attr($this->get_meterage_min()) . '" inputmode="decimal" />';
+        $html .= 'value="' . esc_attr($meterage_formatted) . '" data-step="' . esc_attr($this->get_meterage_step()) . '" data-min="' . esc_attr($this->get_meterage_min()) . '" inputmode="decimal" />';
         $html .= '<input type="hidden" name="cart[' . esc_attr($cart_item_key) . '][qty]" value="1" />';
         $html .= '</div>';
 
@@ -723,6 +821,24 @@ class Woo_Excel_Mng_Frontend
             return;
         }
 
+        $is_cart = function_exists('is_cart') && is_cart();
+        $is_checkout = function_exists('is_checkout') && is_checkout();
+
+        if ($is_cart) {
+            echo '<div class="woo-excel-shipping-info-box woo-excel-shipping-minimal">';
+            echo '<h3>' . esc_html__('اطلاعات حمل‌ونقل', 'woo-excel-mng') . '</h3>';
+            echo '<div class="woo-excel-shipping-note">';
+            echo '<span class="dashicons dashicons-info"></span>';
+            echo '<p>' . esc_html__('هزینه حمل در مرحله بعد محاسبه می‌شود.', 'woo-excel-mng') . '</p>';
+            echo '</div>';
+            echo '</div>';
+            return;
+        }
+
+        if (!$is_checkout) {
+            return;
+        }
+
         // دریافت شهر مبدا
         $origin_city = get_option('woo_excel_mng_origin_city', 'تهران');
 
@@ -734,17 +850,14 @@ class Woo_Excel_Mng_Frontend
         $destination_city = WC()->session->get('woo_excel_destination_city', '');
 
         // دریافت لیست شهرهای موجود
-        global $wpdb;
-        $table_name = $wpdb->prefix . 'woo_excel_shipping_routes';
-        $cities = $wpdb->get_col($wpdb->prepare(
-            "SELECT DISTINCT destination_city FROM $table_name WHERE is_active = 1 ORDER BY destination_city"
-        ));
+        $city_options = $this->get_destination_city_options();
+        if (count($city_options) <= 1) {
+            return;
+        }
 
-        // محاسبه وزن هر آیتم و جمع کل + اطلاعات کامل
-        $cart_items_details = array();
+        // محاسبه وزن هر آیتم و جمع کل
         $total_weight = 0;
         $cart_total = 0;
-        $total_meterage = 0;
 
         foreach (WC()->cart->get_cart() as $cart_item_key => $cart_item) {
             $product = $cart_item['data'];
@@ -795,15 +908,6 @@ class Woo_Excel_Mng_Frontend
             } else {
                 $item_weight = floatval($product->get_weight()) * $meterage;
             }
-
-            $cart_items_details[] = array(
-                'name' => $product_name,
-                'meterage' => $meterage,
-                'length' => $length,
-                'color' => $color,
-                'thickness' => $thickness,
-                'weight' => $item_weight
-            );
 
             $total_weight += $item_weight;
 
@@ -887,58 +991,23 @@ class Woo_Excel_Mng_Frontend
         }
 
 ?>
-        <div class="woo-excel-shipping-info-box">
+        <div class="woo-excel-shipping-info-box woo-excel-shipping-payment-box woocommerce-billing-fields">
             <h3><?php _e('اطلاعات حمل‌ونقل', 'woo-excel-mng'); ?></h3>
 
             <!-- انتخاب شهر مقصد -->
             <div class="woo-excel-destination-selector">
-                <label for="woo_excel_destination_city_cart">
-                    <strong><?php _e('شهر مقصد:', 'woo-excel-mng'); ?></strong>
-                </label>
-                <select id="woo_excel_destination_city_cart" name="woo_excel_destination_city" class="woo-excel-city-select">
-                    <option value=""><?php _e('-- انتخاب شهر --', 'woo-excel-mng'); ?></option>
-                    <?php foreach ($cities as $city): ?>
-                        <option value="<?php echo esc_attr($city); ?>" <?php selected($destination_city, $city); ?>>
-                            <?php echo esc_html($city); ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
+                <?php
+                woocommerce_form_field('woo_excel_destination_city', array(
+                    'type' => 'select',
+                    'class' => array('woo-excel-city-select'),
+                    'label' => __('شهر مقصد', 'woo-excel-mng'),
+                    'required' => true,
+                    'options' => $city_options,
+                ), $destination_city);
+                ?>
             </div>
 
-            <!-- جزئیات آیتم‌ها -->
-            <div class="woo-excel-items-weights">
-                <h4><?php _e('جزئیات آیتم‌ها:', 'woo-excel-mng'); ?></h4>
-                <table class="woo-excel-weights-table">
-                    <thead>
-                        <tr>
-                            <th><?php _e('محصول', 'woo-excel-mng'); ?></th>
-                            <th><?php _e('متراژ', 'woo-excel-mng'); ?></th>
-                            <th><?php _e('طول', 'woo-excel-mng'); ?></th>
-                            <th><?php _e('رنگ', 'woo-excel-mng'); ?></th>
-                            <th><?php _e('ضخامت', 'woo-excel-mng'); ?></th>
-                            <th><?php _e('وزن', 'woo-excel-mng'); ?></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($cart_items_details as $item): ?>
-                            <tr>
-                                <td><?php echo esc_html($item['name']); ?></td>
-                                <td class="meterage-value"><?php echo esc_html(woo_excel_mng_format_number($item['meterage'], 2, '.', '')); ?> <?php _e('متر', 'woo-excel-mng'); ?></td>
-                                <td><?php echo esc_html($item['length'] ? $item['length'] : '-'); ?></td>
-                                <td><?php echo esc_html($item['color'] ? $item['color'] : '-'); ?></td>
-                                <td><?php echo esc_html($item['thickness'] ? $item['thickness'] : '-'); ?></td>
-                                <td class="weight-value"><?php echo wc_format_weight($item['weight']); ?></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                    <tfoot>
-                        <tr class="total-weight-row">
-                            <td colspan="5"><strong><?php _e('جمع کل وزن:', 'woo-excel-mng'); ?></strong></td>
-                            <td class="weight-value"><strong><?php echo wc_format_weight($total_weight); ?></strong></td>
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
+            <!-- جزئیات آیتم‌ها حذف شد -->
 
             <!-- اطلاعات حمل‌ونقل -->
             <?php if ($destination_city): ?>
@@ -1048,44 +1117,6 @@ class Woo_Excel_Mng_Frontend
             <?php endif; ?>
         </div>
 
-        <script type="text/javascript">
-            jQuery(document).ready(function($) {
-                $('#woo_excel_destination_city_cart').on('change', function() {
-                    var city = $(this).val();
-                    var $select = $(this);
-
-                    // نمایش loading
-                    $select.prop('disabled', true);
-
-                    $.ajax({
-                        url: wooExcelMngFrontend.ajax_url,
-                        type: 'POST',
-                        data: {
-                            action: 'woo_excel_mng_save_destination_city',
-                            nonce: wooExcelMngFrontend.nonce,
-                            city: city
-                        },
-                        success: function(response) {
-                            if (response && response.success) {
-                                // به‌روزرسانی cart totals
-                                $('body').trigger('update_checkout');
-                                // رفرش صفحه برای نمایش اطلاعات جدید
-                                window.location.reload();
-                            } else {
-                                var errorMsg = (response && response.data) ? response.data : 'خطا در ذخیره شهر';
-                                alert('خطا: ' + errorMsg);
-                                $select.prop('disabled', false);
-                            }
-                        },
-                        error: function(xhr, status, error) {
-                            console.error('AJAX Error:', status, error);
-                            alert('خطا در ارتباط با سرور. لطفاً دوباره تلاش کنید.');
-                            $select.prop('disabled', false);
-                        }
-                    });
-                });
-            });
-        </script>
     <?php
     }
 
@@ -1223,9 +1254,10 @@ class Woo_Excel_Mng_Frontend
                         if ($row.find('.woo-excel-meterage-display').length > 0) {
                             // تنظیم step و min برای جلوگیری از گرد شدن
                             $input.attr({
-                                'step': '<?php echo esc_js($this->get_meterage_step()); ?>',
-                                'min': '<?php echo esc_js($this->get_meterage_min()); ?>',
-                                'type': 'number'
+                                'data-step': '<?php echo esc_js($this->get_meterage_step()); ?>',
+                                'data-min': '<?php echo esc_js($this->get_meterage_min()); ?>',
+                                'type': 'text',
+                                'inputmode': 'decimal'
                             });
                         }
                     });
@@ -1279,6 +1311,102 @@ class Woo_Excel_Mng_Frontend
         }
 
         return $subtotal;
+    }
+
+    /**
+     * حذف فیلدهای پیش‌فرض و نمایش فیلدهای مورد نیاز در تسویه حساب
+     */
+    public function customize_checkout_fields($fields) {
+        $fields['billing'] = array(
+            'billing_first_name' => array(
+                'label' => __('نام', 'woo-excel-mng'),
+                'required' => true,
+                'class' => array('form-row-first'),
+                'priority' => 10,
+            ),
+            'billing_last_name' => array(
+                'label' => __('نام خانوادگی', 'woo-excel-mng'),
+                'required' => true,
+                'class' => array('form-row-last'),
+                'priority' => 20,
+            ),
+            'billing_phone' => array(
+                'label' => __('شماره همراه', 'woo-excel-mng'),
+                'required' => true,
+                'type' => 'tel',
+                'class' => array('form-row-wide'),
+                'priority' => 30,
+            ),
+            'billing_address_1' => array(
+                'label' => __('آدرس', 'woo-excel-mng'),
+                'required' => true,
+                'type' => 'textarea',
+                'class' => array('form-row-wide'),
+                'priority' => 40,
+            ),
+        );
+
+        $fields['shipping'] = array();
+        $fields['order'] = array();
+
+        return $fields;
+    }
+
+    /**
+     * نمایش خلاصه هزینه حمل در ابتدای صفحه تسویه حساب
+     */
+    private function get_checkout_shipping_summary_html() {
+        if (!WC()->cart || WC()->cart->is_empty()) {
+            return '';
+        }
+
+        $destination_city = WC()->session->get('woo_excel_destination_city', '');
+        $summary = $this->get_shipping_summary($destination_city);
+
+        ob_start();
+        echo '<div id="woo-excel-shipping-summary-top" class="woo-excel-shipping-info-box woo-excel-shipping-payment-box woo-excel-shipping-summary-top">';
+        echo '<h3>' . esc_html__('هزینه حمل', 'woo-excel-mng') . '</h3>';
+
+        if (!$summary || !$destination_city) {
+            echo '<div class="woo-excel-shipping-note"><span class="dashicons dashicons-info"></span><p>' . esc_html__('با انتخاب شهر مقصد، هزینه حمل محاسبه می‌شود.', 'woo-excel-mng') . '</p></div>';
+            echo '</div>';
+            return ob_get_clean();
+        }
+
+        $vehicle_names = array(
+            'peykan' => 'پیکان',
+            'mazda' => 'مزدا',
+            'nissan' => 'نیسان'
+        );
+        $vehicle_name = isset($vehicle_names[$summary['vehicle']]) ? $vehicle_names[$summary['vehicle']] : ucfirst($summary['vehicle']);
+
+        echo '<div class="woo-excel-shipping-details">';
+        echo '<p><strong>' . esc_html__('نوع وسیله:', 'woo-excel-mng') . '</strong> <span class="vehicle-name">' . esc_html($vehicle_name) . '</span></p>';
+        if ($summary['is_free']) {
+            echo '<p><strong>' . esc_html__('هزینه حمل:', 'woo-excel-mng') . '</strong> <span class="shipping-cost">' . esc_html__('رایگان', 'woo-excel-mng') . '</span></p>';
+        } else {
+            echo '<p><strong>' . esc_html__('هزینه حمل:', 'woo-excel-mng') . '</strong> <span class="shipping-cost">' . woo_excel_mng_format_price($summary['shipping_cost']) . '</span></p>';
+        }
+        echo '</div>';
+        echo '</div>';
+
+        return ob_get_clean();
+    }
+
+    public function render_checkout_shipping_summary() {
+        if (!function_exists('is_checkout') || !is_checkout()) {
+            return;
+        }
+
+        echo $this->get_checkout_shipping_summary_html();
+    }
+
+    public function add_checkout_shipping_summary_fragment($fragments) {
+        $html = $this->get_checkout_shipping_summary_html();
+        if (!empty($html)) {
+            $fragments['#woo-excel-shipping-summary-top'] = $html;
+        }
+        return $fragments;
     }
 
     /**
@@ -1402,6 +1530,11 @@ class Woo_Excel_Mng_Frontend
 
         // جلوگیری از اجرا در admin (به جز AJAX)
         if (is_admin() && !defined('DOING_AJAX')) {
+            return;
+        }
+
+        // نمایش هزینه حمل فقط در مرحله تسویه حساب
+        if (function_exists('is_cart') && is_cart()) {
             return;
         }
 
@@ -1895,6 +2028,21 @@ class Woo_Excel_Mng_Frontend
     }
 
     /**
+     * انتقال جزئیات پرداخت به پایین سفارش
+     */
+    public function reposition_checkout_billing_fields()
+    {
+        if (!function_exists('is_checkout') || !is_checkout()) {
+            return;
+        }
+
+        if (function_exists('woocommerce_checkout_billing')) {
+            remove_action('woocommerce_checkout_billing', 'woocommerce_checkout_billing', 10);
+            add_action('woocommerce_checkout_after_order_review', 'woocommerce_checkout_billing', 10);
+        }
+    }
+
+    /**
      * غیرفعال کردن کد تخفیف در سبد خرید
      */
     public function disable_cart_coupons($enabled)
@@ -1904,5 +2052,17 @@ class Woo_Excel_Mng_Frontend
         }
 
         return $enabled;
+    }
+
+    /**
+     * مخفی کردن حمل‌ونقل در سبد خرید
+     */
+    public function disable_cart_shipping_display($needs_shipping)
+    {
+        if (function_exists('is_cart') && is_cart()) {
+            return false;
+        }
+
+        return $needs_shipping;
     }
 }

@@ -4,8 +4,8 @@
  * Plugin Name: مدیریت محصولات متغیر ووکامرس
  * Plugin URI: https://example.com
  * Description: مدیریت انبوه محصولات متغیر ووکامرس از طریق Excel، مدیریت حمل‌ونقل پیشرفته و فرمول‌های قیمت‌گذاری پویا
- * Version: 1.0.13
- * Author: Your Name
+ * Version: 1.0.28
+ * Author: محمد سیفی
  * Author URI: https://example.com
  * Text Domain: woo-excel-mng
  * Domain Path: /languages
@@ -33,7 +33,7 @@ if (!in_array('woocommerce/woocommerce.php', apply_filters('active_plugins', get
 }
 
 // تعریف ثابت‌های افزونه
-define('WOO_EXCEL_MNG_VERSION', '1.0.13');
+define('WOO_EXCEL_MNG_VERSION', '1.0.28');
 define('WOO_EXCEL_MNG_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('WOO_EXCEL_MNG_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('WOO_EXCEL_MNG_PLUGIN_BASENAME', plugin_basename(__FILE__));

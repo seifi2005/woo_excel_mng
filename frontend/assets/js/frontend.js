@@ -34,17 +34,12 @@
             });
         }
 
-        // نرمال‌سازی متراژ بر اساس گام
+        // نرمال‌سازی متراژ
         function normalizeMeterageValue(value) {
             var meterage = parseFloat(value);
             if (isNaN(meterage)) {
                 return meterage;
             }
-
-            if (meterageStep > 0) {
-                meterage = Math.round(meterage / meterageStep) * meterageStep;
-            }
-
             return parseFloat(meterage.toFixed(2));
         }
 
@@ -55,6 +50,7 @@
                 $productQtyInput.attr({
                     'step': meterageStep,
                     'min': meterageMin,
+                    'type': 'text',
                     'inputmode': 'decimal'
                 });
             }
@@ -91,6 +87,7 @@
             $quantityInput.attr({
                 'step': meterageStep,
                 'min': meterageMin,
+                'type': 'text',
                 'inputmode': 'decimal'
             });
 
@@ -237,18 +234,60 @@
                     $input.attr({
                         'step': meterageStep,
                         'min': meterageMin,
-                        'type': 'number'
+                        'type': 'text',
+                        'inputmode': 'decimal'
                     });
                 }
+            });
+        }
+
+        function hideDefaultQuantityInputs() {
+            $('.quantity input.qty').not('[type="hidden"]').each(function() {
+                var $input = $(this);
+                $input.attr({
+                    'type': 'text',
+                    'inputmode': 'decimal'
+                });
+                $input.removeAttr('step').removeAttr('min').removeAttr('max');
+            });
+
+            if ($('input[name="woo_excel_meterage"]').length) {
+                $('.quantity input.qty[name="quantity"]').not('[type="hidden"]').closest('.quantity').find('input.qty[name="quantity"]').hide();
+            }
+
+            $('table.cart tr.cart_item').each(function() {
+                var $row = $(this);
+                if ($row.find('input.woo-excel-meterage-input').length) {
+                    $row.find('input.qty[name^="cart"]').not('[type="hidden"]').hide();
+                }
+            });
+        }
+
+        function forceDecimalQuantityInputs() {
+            $('.quantity input.qty, input.woo-excel-meterage-input').not('[type="hidden"]').each(function() {
+                var $input = $(this);
+                $input.attr({
+                    'type': 'text',
+                    'inputmode': 'decimal'
+                });
+                $input.removeAttr('step').removeAttr('min').removeAttr('max');
             });
         }
         
         // اجرا هنگام بارگذاری صفحه
         setupCartQuantityInputs();
+        hideDefaultQuantityInputs();
+        forceDecimalQuantityInputs();
         
         // اجرا بعد از به‌روزرسانی سبد خرید
         $(document).on('updated_wc_div', function() {
             setTimeout(setupCartQuantityInputs, 100);
+            setTimeout(hideDefaultQuantityInputs, 100);
+            setTimeout(forceDecimalQuantityInputs, 100);
+        });
+
+        $(document).on('found_variation', function() {
+            setTimeout(forceDecimalQuantityInputs, 0);
         });
         
         // ===== مدیریت تغییر quantity در سبد خرید =====
@@ -366,30 +405,55 @@
         });
         
         // ===== مدیریت انتخاب شهر مقصد =====
-        if ($('#woo_excel_destination_city').length) {
-            $('#woo_excel_destination_city').on('change', function() {
-                var city = $(this).val();
-                
-                if (!city) {
-                    return;
-                }
-                
-                // ذخیره در session
-                $.ajax({
-                    url: wooExcelMngFrontend.ajax_url,
-                    type: 'POST',
-                    data: {
-                        action: 'woo_excel_mng_save_destination_city',
-                        nonce: wooExcelMngFrontend.nonce,
-                        city: city
-                    },
-                    success: function() {
-                        // به‌روزرسانی نرخ‌های حمل‌ونقل
-                        $('body').trigger('update_checkout');
+        function saveDestinationCity(city, $select) {
+            if (!city) {
+                return;
+            }
+
+            if ($select && $select.length) {
+                $select.prop('disabled', true);
+            }
+
+            $.ajax({
+                url: wooExcelMngFrontend.ajax_url,
+                type: 'POST',
+                data: {
+                    action: 'woo_excel_mng_save_destination_city',
+                    nonce: wooExcelMngFrontend.nonce,
+                    city: city
+                },
+                success: function(response) {
+                    if (response && response.success) {
+                        if ($('body').hasClass('woocommerce-cart')) {
+                            window.location.reload();
+                        } else {
+                            if ($select && $select.length) {
+                                $select.prop('disabled', false);
+                            }
+                            $('body').trigger('update_checkout');
+                        }
+                    } else {
+                        var errorMsg = (response && response.data) ? response.data : 'خطا در ذخیره شهر';
+                        alert('خطا: ' + errorMsg);
+                        if ($select && $select.length) {
+                            $select.prop('disabled', false);
+                        }
                     }
-                });
+                },
+                error: function() {
+                    alert('خطا در ارتباط با سرور. لطفاً دوباره تلاش کنید.');
+                    if ($select && $select.length) {
+                        $select.prop('disabled', false);
+                    }
+                }
             });
         }
+
+        $(document).on('change', '#woo_excel_destination_city, .woo-excel-city-select', function() {
+            var $select = $(this);
+            var city = $select.val();
+            saveDestinationCity(city, $select);
+        });
         
     });
     
