@@ -116,7 +116,11 @@ class Woo_Excel_Mng_Frontend
 
         // نمایش باکس حمل‌ونقل در سبد خرید و تسویه حساب
         add_action('woocommerce_after_cart_table', array($this, 'display_shipping_info_box'), 10);
-        add_action('woocommerce_checkout_before_customer_details', array($this, 'display_shipping_info_box'), 10);
+        add_action('woocommerce_review_order_after_payment', array($this, 'display_shipping_info_box'), 10);
+
+        // مخفی کردن حمل‌ونقل در سبد خرید
+        add_filter('woocommerce_cart_needs_shipping', array($this, 'disable_cart_shipping_display'), 20, 1);
+        add_filter('woocommerce_cart_totals_needs_shipping', array($this, 'disable_cart_shipping_display'), 20, 1);
     }
 
     /**
@@ -745,6 +749,24 @@ class Woo_Excel_Mng_Frontend
             return;
         }
 
+        $is_cart = function_exists('is_cart') && is_cart();
+        $is_checkout = function_exists('is_checkout') && is_checkout();
+
+        if ($is_cart) {
+            echo '<div class="woo-excel-shipping-info-box woo-excel-shipping-minimal">';
+            echo '<h3>' . esc_html__('اطلاعات حمل‌ونقل', 'woo-excel-mng') . '</h3>';
+            echo '<div class="woo-excel-shipping-note">';
+            echo '<span class="dashicons dashicons-info"></span>';
+            echo '<p>' . esc_html__('هزینه حمل در مرحله بعد محاسبه می‌شود.', 'woo-excel-mng') . '</p>';
+            echo '</div>';
+            echo '</div>';
+            return;
+        }
+
+        if (!$is_checkout) {
+            return;
+        }
+
         // دریافت شهر مبدا
         $origin_city = get_option('woo_excel_mng_origin_city', 'تهران');
 
@@ -897,33 +919,26 @@ class Woo_Excel_Mng_Frontend
         }
 
 ?>
-        <div class="woo-excel-shipping-info-box">
+        <div class="woo-excel-shipping-info-box woo-excel-shipping-payment-box">
             <h3><?php _e('اطلاعات حمل‌ونقل', 'woo-excel-mng'); ?></h3>
 
-            <?php if ($is_cart): ?>
-                <div class="woo-excel-shipping-note">
-                    <span class="dashicons dashicons-info"></span>
-                    <p><?php _e('هزینه حمل در مرحله بعد محاسبه می‌شود.', 'woo-excel-mng'); ?></p>
-                </div>
-            <?php else: ?>
-                <!-- انتخاب شهر مقصد -->
-                <div class="woo-excel-destination-selector">
-                    <?php
-                    woocommerce_form_field('woo_excel_destination_city', array(
-                        'type' => 'select',
-                        'class' => array('woo-excel-city-select'),
-                        'label' => __('شهر مقصد', 'woo-excel-mng'),
-                        'required' => true,
-                        'options' => $city_options,
-                    ), $destination_city);
-                    ?>
-                </div>
-            <?php endif; ?>
+            <!-- انتخاب شهر مقصد -->
+            <div class="woo-excel-destination-selector">
+                <?php
+                woocommerce_form_field('woo_excel_destination_city', array(
+                    'type' => 'select',
+                    'class' => array('woo-excel-city-select'),
+                    'label' => __('شهر مقصد', 'woo-excel-mng'),
+                    'required' => true,
+                    'options' => $city_options,
+                ), $destination_city);
+                ?>
+            </div>
 
             <!-- جزئیات آیتم‌ها حذف شد -->
 
             <!-- اطلاعات حمل‌ونقل -->
-            <?php if (!$is_cart && $destination_city): ?>
+            <?php if ($destination_city): ?>
                 <div class="woo-excel-shipping-details">
                     <?php if ($vehicle_upgrade_notice): ?>
                         <div class="woo-excel-vehicle-change-alert">
@@ -1023,7 +1038,7 @@ class Woo_Excel_Mng_Frontend
                         <?php endif; ?>
                     <?php endif; ?>
                 </div>
-            <?php elseif (!$is_cart): ?>
+            <?php else: ?>
                 <div class="woo-excel-select-city-notice">
                     <p><?php _e('لطفاً شهر مقصد را انتخاب کنید تا هزینه حمل محاسبه شود.', 'woo-excel-mng'); ?></p>
                 </div>
@@ -1893,5 +1908,17 @@ class Woo_Excel_Mng_Frontend
         }
 
         return $enabled;
+    }
+
+    /**
+     * مخفی کردن حمل‌ونقل در سبد خرید
+     */
+    public function disable_cart_shipping_display($needs_shipping)
+    {
+        if (function_exists('is_cart') && is_cart()) {
+            return false;
+        }
+
+        return $needs_shipping;
     }
 }

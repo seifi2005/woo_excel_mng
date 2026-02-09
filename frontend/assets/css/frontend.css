@@ -240,6 +240,20 @@
     color: #2271b1;
 }
 
+.woo-excel-shipping-payment-box {
+    border: 1px solid #e2e4e7;
+    border-radius: 8px;
+    padding: 16px;
+    background: #fff;
+}
+
+.woo-excel-shipping-minimal {
+    border: 1px solid #e2e4e7;
+    border-radius: 8px;
+    padding: 16px;
+    background: #fff;
+}
+
 .woo-excel-vehicle-change-alert {
     background: #ffe066;
     border: 2px solid #e67700;

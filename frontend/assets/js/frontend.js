@@ -247,6 +247,15 @@
         }
 
         function hideDefaultQuantityInputs() {
+            $('.quantity input.qty').not('[type="hidden"]').each(function() {
+                var $input = $(this);
+                $input.attr({
+                    'type': 'text',
+                    'inputmode': 'decimal'
+                });
+                $input.removeAttr('step').removeAttr('min').removeAttr('max');
+            });
+
             if ($('input[name="woo_excel_meterage"]').length) {
                 $('.quantity input.qty[name="quantity"]').not('[type="hidden"]').closest('.quantity').find('input.qty[name="quantity"]').hide();
             }
