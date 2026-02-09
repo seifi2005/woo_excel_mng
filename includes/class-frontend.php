@@ -78,6 +78,7 @@ class Woo_Excel_Mng_Frontend
 
         // حذف فیلدهای پیش‌فرض و نمایش فیلدهای مورد نیاز
         add_filter('woocommerce_checkout_fields', array($this, 'customize_checkout_fields'), 20, 1);
+        add_action('wp', array($this, 'reposition_checkout_billing_fields'));
         add_action('woocommerce_checkout_process', array($this, 'validate_destination_city'));
         add_action('woocommerce_checkout_update_order_meta', array($this, 'save_destination_city'));
 
@@ -116,7 +117,7 @@ class Woo_Excel_Mng_Frontend
 
         // نمایش باکس حمل‌ونقل در سبد خرید و تسویه حساب
         add_action('woocommerce_after_cart_table', array($this, 'display_shipping_info_box'), 10);
-        add_action('woocommerce_review_order_after_payment', array($this, 'display_shipping_info_box'), 10);
+        add_action('woocommerce_checkout_after_order_review', array($this, 'display_shipping_info_box'), 20);
 
         // مخفی کردن حمل‌ونقل در سبد خرید
         add_filter('woocommerce_cart_needs_shipping', array($this, 'disable_cart_shipping_display'), 20, 1);
@@ -919,7 +920,7 @@ class Woo_Excel_Mng_Frontend
         }
 
 ?>
-        <div class="woo-excel-shipping-info-box woo-excel-shipping-payment-box">
+        <div class="woo-excel-shipping-info-box woo-excel-shipping-payment-box woocommerce-billing-fields">
             <h3><?php _e('اطلاعات حمل‌ونقل', 'woo-excel-mng'); ?></h3>
 
             <!-- انتخاب شهر مقصد -->
@@ -1895,6 +1896,21 @@ class Woo_Excel_Mng_Frontend
         if (!empty($_POST['woo_excel_destination_city'])) {
             $city = sanitize_text_field($_POST['woo_excel_destination_city']);
             update_post_meta($order_id, '_woo_excel_destination_city', $city);
+        }
+    }
+
+    /**
+     * انتقال جزئیات پرداخت به پایین سفارش
+     */
+    public function reposition_checkout_billing_fields()
+    {
+        if (!function_exists('is_checkout') || !is_checkout()) {
+            return;
+        }
+
+        if (function_exists('woocommerce_checkout_billing')) {
+            remove_action('woocommerce_checkout_billing', 'woocommerce_checkout_billing', 10);
+            add_action('woocommerce_checkout_after_order_review', 'woocommerce_checkout_billing', 10);
         }
     }
 
